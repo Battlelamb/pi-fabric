@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { pathToFileURL } from "node:url";
+import { DefaultResourceLoader, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import fabricProviderBridge, {
   fabricExtensionEntries,
+  hostBundleSdkEntry,
+  loadHostSdk,
   orderProviderCandidates,
   parseModelKey,
   PROVIDER_BRIDGE_MODEL_ENV,
@@ -90,6 +93,31 @@ describe("extension provider bridge", () => {
       path.resolve("dist/index.js"),
       path.resolve("dist/extension-bootstrap.js"),
     ]));
+  });
+
+  it("uses the bundled Pi CLI's own SDK entry instead of evaluating the unbundled package", async () => {
+    const pkg = fs.realpathSync(path.resolve("node_modules/@earendil-works/pi-coding-agent"));
+    const bundle = path.join(pkg, "dist", "bundle");
+    expect(hostBundleSdkEntry(path.join(bundle, "cli.js"))).toBe(path.join(bundle, "index.js"));
+    const sdk = await loadHostSdk(path.join(bundle, "cli.js"));
+    const bundled = await import(pathToFileURL(path.join(bundle, "index.js")).href) as typeof sdk;
+    expect(sdk.DefaultResourceLoader).toBe(bundled.DefaultResourceLoader);
+    expect(sdk.DefaultResourceLoader).not.toBe(DefaultResourceLoader);
+    for (const name of ["ModelRuntime", "SettingsManager", "hasTrustRequiringProjectResources", "ProjectTrustStore",
+      "DefaultPackageManager", "getAgentDir"] as const) expect(typeof sdk[name]).toBe("function");
+
+    // Unbundled CLIs, the durable worker, embeds, and look-alike paths keep the package entry.
+    const lookalike = path.join(fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "fabric-bridge-host-"))), "dist", "bundle");
+    roots.push(path.dirname(path.dirname(lookalike)));
+    fs.mkdirSync(lookalike, { recursive: true });
+    fs.writeFileSync(path.join(lookalike, "..", "..", "package.json"), '{"name":"not-pi"}');
+    fs.writeFileSync(path.join(lookalike, "cli.js"), "");
+    fs.writeFileSync(path.join(lookalike, "index.js"), "");
+    for (const host of [path.join(pkg, "dist", "cli.js"), path.resolve("src/durable/worker.ts"),
+      path.join(lookalike, "cli.js"), path.join(bundle, "missing", "cli.js"), undefined]) {
+      expect(hostBundleSdkEntry(host)).toBeUndefined();
+    }
+    expect((await loadHostSdk(path.join(pkg, "dist", "cli.js"))).DefaultResourceLoader).toBe(DefaultResourceLoader);
   });
 
   it("registers only the named extension's provider and runs no other extension", async () => {
