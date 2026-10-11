@@ -93,7 +93,37 @@ if (missing.length > 0) throw new Error(`Missing build artifacts:\n${missing.joi
 const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const targets = (value) => typeof value === "string" ? [value]
   : value && typeof value === "object" ? Object.values(value).flatMap(targets) : [];
-for (const target of targets([manifest.main, manifest.types, manifest.exports, manifest.pi?.extensions, manifest.bin])) {
+// Pi packages Fabric bundles load through their node_modules resource paths
+// (Pi's packages.md); they are not part of Fabric's compiled graph.
+const hostPackages = ["@earendil-works/pi-ai", "@earendil-works/pi-agent-core", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui", "typebox"];
+const bundled = manifest.bundledDependencies ?? [];
+const bundledEntry = (target) => /^\.\/node_modules\/((?:@[^/]+\/)?[^/]+)\/(.+)$/.exec(target);
+const ownExtensions = (manifest.pi?.extensions ?? []).filter((target) => !bundledEntry(target));
+for (const name of bundled) {
+  if (!/^\d+\.\d+\.\d+$/.test(manifest.dependencies?.[name] ?? "")) {
+    throw new Error(`Bundled Pi package ${name} must be an exact runtime dependency`);
+  }
+  const bundledManifestPath = join(root, "node_modules", name, "package.json");
+  if (!existsSync(bundledManifestPath)) throw new Error(`Bundled Pi package is not installed: ${name}`);
+  const bundledManifest = JSON.parse(readFileSync(bundledManifestPath, "utf8"));
+  for (const host of hostPackages) {
+    if (bundledManifest.dependencies?.[host] !== undefined) {
+      throw new Error(`Bundled Pi package ${name} must declare host package ${host} as a peer, not a dependency`);
+    }
+  }
+}
+for (const target of manifest.pi?.extensions ?? []) {
+  const match = bundledEntry(target);
+  if (!match) continue;
+  const [, name, file] = match;
+  if (!bundled.includes(name)) throw new Error(`Extension entry ${target} is not a bundled dependency`);
+  const declared = (JSON.parse(readFileSync(join(root, "node_modules", name, "package.json"), "utf8")).pi?.extensions ?? [])
+    .map((entry) => entry.replace(/^\.\//, ""));
+  if (!declared.includes(file) || !existsSync(join(root, target))) {
+    throw new Error(`Bundled extension entry ${target} is not declared by ${name}`);
+  }
+}
+for (const target of targets([manifest.main, manifest.types, manifest.exports, ownExtensions, manifest.bin])) {
   if (!target.startsWith("./dist/") || target.split("/").includes("..") || !existsSync(join(root, target))) {
     throw new Error(`Missing or unpackaged public entrypoint: ${target}`);
   }
@@ -150,7 +180,7 @@ if ([...validator.matchAll(staticImport)].length || /\bimport\s*\(/.test(validat
   throw new Error("Worker validator must be self-contained");
 }
 // Measure the entry Pi actually loads, including every shared static chunk.
-const startupFiles = staticClosure(manifest.pi.extensions.map(file => resolve(root, file)));
+const startupFiles = staticClosure(ownExtensions.map(file => resolve(root, file)));
 const startupBytes = [...startupFiles].reduce((sum, file) => sum + Buffer.byteLength(readFileSync(file)), 0);
 if (startupBytes > 1000 * 1024 || startupFiles.size > 41) {
   throw new Error(`Startup static graph grew beyond its budget: ${startupBytes} bytes in ${startupFiles.size} files`);
