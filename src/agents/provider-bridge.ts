@@ -60,7 +60,16 @@ const realPath = (file: string): string => {
   }
 };
 
-/** Fabric's own manifest entries: they never register chat providers. */
+/** A manifest entry that loads a Pi package Fabric bundles (`node_modules/<package>/...`). */
+const isBundledPackageEntry = (entry: string): boolean =>
+  entry.replace(/\\/g, "/").replace(/^(?:\.\/)+/, "").startsWith("node_modules/");
+
+/**
+ * Fabric's own manifest entries: they never register chat providers. Entries
+ * of bundled Pi packages (pi-coralbricks-provider) are not Fabric's own: they
+ * stay probe candidates, so the bundled provider resolves without loading
+ * Fabric's main extension.
+ */
 export function fabricExtensionEntries(moduleUrl = import.meta.url): string[] {
   const root = path.resolve(path.dirname(fileURLToPath(moduleUrl)), "..", "..");
   try {
@@ -71,7 +80,9 @@ export function fabricExtensionEntries(moduleUrl = import.meta.url): string[] {
     };
     if (manifest.name !== "pi-fabric") return [];
     const entries = [manifest.main, ...(Array.isArray(manifest.pi?.extensions) ? manifest.pi.extensions : [])];
-    return entries.filter((entry): entry is string => typeof entry === "string").map((entry) => path.resolve(root, entry));
+    return entries
+      .filter((entry): entry is string => typeof entry === "string" && !isBundledPackageEntry(entry))
+      .map((entry) => path.resolve(root, entry));
   } catch {
     return [];
   }
