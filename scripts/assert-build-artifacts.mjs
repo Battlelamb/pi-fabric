@@ -45,6 +45,7 @@ const lazy = [
   "agents/result.js",
   "agents/veda-cli.js",
   "agents/provider-bridge.js",
+  "core/host-sdk.js",
   "fabric-runtime-state.js",
   "components/configuration.js",
   "providers/jev-provider.js",
@@ -190,6 +191,16 @@ for (const file of startupFiles) {
   for (const match of readFileSync(file, "utf8").matchAll(staticImport)) {
     if (optionalPackages.some(name => match[1] === name || match[1]?.startsWith(`${name}/`))) {
       throw new Error(`Startup eagerly imports optional dependency ${match[1]} from ${file}`);
+    }
+  }
+}
+// Pi loads this graph as native ESM, where jiti's virtual host modules never
+// apply: a runtime SDK import (including the bare `import "pkg"` left by an
+// inline `type` specifier) evaluates a second, unbundled SDK in the bundled CLI.
+for (const file of startupFiles) {
+  for (const match of readFileSync(file, "utf8").matchAll(staticImport)) {
+    if (match[1] === "@earendil-works/pi-coding-agent" || match[1]?.startsWith("@earendil-works/pi-coding-agent/")) {
+      throw new Error(`Startup imports the Pi SDK at runtime from ${file}; use import type or src/core/host-sdk.ts`);
     }
   }
 }

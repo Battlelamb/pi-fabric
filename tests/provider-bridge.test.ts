@@ -6,13 +6,12 @@ import { DefaultResourceLoader, ModelRuntime } from "@earendil-works/pi-coding-a
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import fabricProviderBridge, {
   fabricExtensionEntries,
-  hostBundleSdkEntry,
-  loadHostSdk,
   orderProviderCandidates,
   parseModelKey,
   PROVIDER_BRIDGE_MODEL_ENV,
   resolveExtensionProviders,
 } from "../src/agents/provider-bridge.js";
+import { hostBundleSdkEntry, loadHostSdk } from "../src/core/host-sdk.js";
 
 const roots: string[] = [];
 afterAll(() => {
