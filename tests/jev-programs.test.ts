@@ -113,15 +113,68 @@ describe("Jev reactive programs", () => {
     expect(run.evaluations).toBe(2); expect(run.usage).toEqual({ input_tokens:6,output_tokens:4 });
   });
   it("blocks later inference when a failed request's usage is unknown", async () => {
-    const replies = [new Response("not json"), new Response("upstream", { status: 503 })];
+    const replies: Array<() => Promise<Response>> = [
+      async () => new Response("not json"),
+      async () => new Response(JSON.stringify({ usage: { input_tokens: 1, output_tokens: 0 } }), { status: 400 }),
+      async () => { throw new Error("connection reset"); },
+      () => new Promise<Response>(() => {}),
+    ];
     for (const reply of replies) {
-      const fetcher = vi.fn(async () => reply) as unknown as typeof fetch;
-      const { provider } = setup({}, fetcher);
+      const fetcher = vi.fn(reply) as unknown as typeof fetch;
+      const { provider } = setup({ jev: { requestTimeoutMs: 100 } }, fetcher);
       const request = "{state:'hello',questions:{yes:{type:'noul',instructions:'Is this a greeting?'}}}";
       const run = await callProgram(provider, "run", launch(`try { await jev.evaluate(${request}); } catch {}
         await jev.evaluate(${request}); return 1;`, { requires: ["jev.evaluate"] }));
       expect(run).toMatchObject({ state: "failed", evaluations: 1, error: expect.stringContaining("budget"), usage: { input_tokens: null, output_tokens: null } });
       expect(fetcher).toHaveBeenCalledTimes(1);
+    }
+  });
+  it("charges a transient HTTP error its request bytes and lets the guest back off and retry", async () => {
+    const bodies: string[] = [];
+    const replies = [
+      new Response("FAKE_SECRET", { status: 429, headers: { "Retry-After": "2" } }),
+      new Response(JSON.stringify({ model:"jev-latest", answers:{yes:{type:"noul",noul:1}},usage:{input_tokens:3,output_tokens:2} })),
+    ];
+    const fetcher = vi.fn(async (_url: string, init: { body: string }) => { bodies.push(init.body); return replies.shift()!; }) as unknown as typeof fetch;
+    const { provider } = setup({}, fetcher);
+    const request = "{state:'hello',questions:{yes:{type:'noul',instructions:'Is this a greeting?'}}}";
+    const run = await callProgram(provider, "run", launch(`let failure: unknown = null;
+      try { await jev.evaluate(${request}); } catch (error) { failure = error; }
+      const { status, retryAfterMs, message } = failure as { status?: number; retryAfterMs?: number; message: string };
+      if (status === 429) await program.sleep(Math.min(retryAfterMs ?? 1000, 10));
+      return { status, retryAfterMs, message, noul: (await jev.evaluate(${request})).answers.yes.noul };`, { requires: ["jev.evaluate"] }));
+    expect(run.state, run.error).toBe("completed");
+    expect(run.result).toEqual({ status: 429, retryAfterMs: 2000, message: "TypeSafe HTTP 429: rate limited; back off before retrying (retry after 2000 ms)", noul: 1 });
+    expect(JSON.stringify(run)).not.toContain("FAKE_SECRET");
+    expect(run.evaluations).toBe(2);
+    expect(run.usage).toEqual({ input_tokens: Buffer.byteLength(bodies[0]!) + 3, output_tokens: 2 });
+  });
+  it("bills usage reported on a transient HTTP error body", async () => {
+    const replies = [
+      new Response(JSON.stringify({ error: "overloaded", usage: { input_tokens: 7, output_tokens: 1 } }), { status: 503 }),
+      new Response(JSON.stringify({ model:"jev-latest", answers:{yes:{type:"noul",noul:1}},usage:{input_tokens:3,output_tokens:2} })),
+    ];
+    const fetcher = vi.fn(async () => replies.shift()!) as unknown as typeof fetch;
+    const { provider } = setup({}, fetcher);
+    const request = "{state:'hello',questions:{yes:{type:'noul',instructions:'Is this a greeting?'}}}";
+    const run = await callProgram(provider, "run", launch(`let status = 0;
+      try { await jev.evaluate(${request}); } catch (error) { status = (error as { status: number }).status; }
+      return { status, noul: (await jev.evaluate(${request})).answers.yes.noul };`, { requires: ["jev.evaluate"] }));
+    expect(run.state, run.error).toBe("completed");
+    expect(run.result).toEqual({ status: 503, noul: 1 });
+    expect(run.usage).toEqual({ input_tokens: 10, output_tokens: 3 });
+  });
+  it("terminates a guest that retries transient HTTP errors forever", async () => {
+    const request = "{state:'hello',questions:{yes:{type:'noul',instructions:'Is this a greeting?'}}}";
+    const forever = `while (true) { try { return await jev.evaluate(${request}); } catch {} }`;
+    for (const limits of [{ maxEvaluations: 5 }, { maxEvaluations: 100, maxTokens: 1000 }]) {
+      const fetcher = vi.fn(async () => new Response("busy", { status: 429 })) as unknown as typeof fetch;
+      const { provider } = setup({}, fetcher);
+      const run = await callProgram(provider, "run", launch(forever, { requires: ["jev.evaluate"], limits }));
+      expect(run).toMatchObject({ state: "failed", error: expect.stringContaining("budget") });
+      expect(run.evaluations).toBeLessThanOrEqual(limits.maxEvaluations);
+      expect(fetcher).toHaveBeenCalledTimes(run.evaluations);
+      if (limits.maxTokens) expect(run.evaluations).toBeLessThan(limits.maxEvaluations);
     }
   });
   it("fails the run when a malformed answer's reported usage exceeds the token budget", async () => {

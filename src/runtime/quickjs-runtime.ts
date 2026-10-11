@@ -1059,6 +1059,11 @@ export class QuickJsRuntime {
                 context.setProp(errorHandle, "__fabricBashExit", metadata);
                 metadata.dispose();
               }
+              for (const [key, value] of guestErrorFields(error)) {
+                const field = context.newNumber(value);
+                context.setProp(errorHandle, key, field);
+                field.dispose();
+              }
               promise.reject(errorHandle);
               errorHandle.dispose();
             })
@@ -1272,4 +1277,16 @@ export class QuickJsRuntime {
       disposeQuickJsContext(context);
     }
   }
+}
+
+/**
+ * Finite numeric fields a host error opts to expose on the guest's error
+ * object (for example a Jev HTTP status), never its message internals.
+ */
+function guestErrorFields(error: unknown): Array<[string, number]> {
+  const fields = error instanceof Error ? (error as { guestFields?: unknown }).guestFields : undefined;
+  if (typeof fields !== "object" || fields === null) return [];
+  return Object.entries(fields).filter((entry): entry is [string, number] =>
+    /^[a-z][A-Za-z]{0,31}$/.test(entry[0]) && !["message", "name", "stack", "cause"].includes(entry[0]) &&
+    typeof entry[1] === "number" && Number.isFinite(entry[1])).slice(0, 8);
 }

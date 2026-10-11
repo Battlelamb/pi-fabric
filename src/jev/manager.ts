@@ -7,7 +7,7 @@ import { FabricAutoApprovalClassifier } from "../core/auto-approval-classifier.j
 import type { FabricConfig } from "../config.js";
 import type { FabricInvocationContext } from "../protocol.js";
 import type { JevLaunch, JevRunInfo, JevJson, JevResponse } from "./types.js";
-import { checkSchema, checkValue, jsonText, object, JevInvalidResponseError } from "./validation.js";
+import { checkSchema, checkValue, jsonText, object, JevBilledError } from "./validation.js";
 import { checkObserve, type JevObservationHost, type JevSubscription } from "./observation.js";
 import { decisionUsage } from "./decisions.js";
 import { DECISION_MAX_BYTES } from "./decision-profiles.js";
@@ -244,9 +244,10 @@ export class JevProgramManager {
               return value;
             } catch (error) {
               if (inference && !accounted) {
-                if (ref === "jev.evaluate" && error instanceof JevInvalidResponseError) {
-                  // A malformed answer with well-formed usage is billed, never surfaced,
-                  // and does not close inference: the guest may fall back and continue.
+                if (ref === "jev.evaluate" && error instanceof JevBilledError) {
+                  // A malformed answer with well-formed usage, or a transient HTTP error at
+                  // its reported or fixed cost, is billed and does not close inference:
+                  // the guest may fall back, back off and retry within its budgets.
                   accountInference({ input: error.usage.input_tokens, output: error.usage.output_tokens, exhausted: false });
                   accounted = true;
                   if (reportedTokens > maxTokens) return failBudget("Jev reported-token budget exhausted");

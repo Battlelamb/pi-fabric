@@ -9,6 +9,17 @@ const options = {
 };
 
 describe("QuickJsRuntime", () => {
+  it("copies only finite numeric opt-in guest fields onto a host error", async () => {
+    const error = Object.assign(new Error("HTTP 429"), { secret: 1, guestFields: { status: 429, retryAfterMs: 1500, message: 7, stack: 1, note: "x", bad: Number.NaN, "x-y": 1 } });
+    const result = await new QuickJsRuntime().execute(
+      "try { await tools.call({ ref: 'fixture.fail' }); } catch (error) { const e = error as Record<string, unknown>; return [e.message, e.status, e.retryAfterMs, e.note, e.bad, e.secret, e['x-y']]; } return null;",
+      async () => { throw error; },
+      options,
+    );
+
+    expect(result.terminationReason, result.error).toBe("completed");
+    expect(result.value).toEqual(["HTTP 429", 429, 1500, null, null, null, null]);
+  });
   it("rejects memory limits that overflow the WASM32 size_t", async () => {
     const result = await new QuickJsRuntime().execute(
       "return 1;",

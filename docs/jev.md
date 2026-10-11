@@ -119,7 +119,7 @@ return { team: result.answers.route.choice, refundProbability: result.answers.re
 - Keep exact rules, arithmetic, source extraction, action execution, and permissions in code. Confidence is neither truth nor authorization.
 - State is sent to TypeSafe. Bound and minimize browser/application data; do not send secrets or unrelated private content.
 
-Fabric accepts up to 128 questions and 255 Choice options per question, subject to the configured request byte cap and upstream limits. Structured JSON instructions/rubrics are supported. Service failures are not automatically retried: a controller must decide whether a retry is affordable and its observation is still fresh. For HTTP 429/529, back off; do not spin.
+Fabric accepts up to 128 questions and 255 Choice options per question, subject to the configured request byte cap and upstream limits. Structured JSON instructions/rubrics are supported. Service failures are not automatically retried: a controller must decide whether a retry is affordable and its observation is still fresh. A received transient HTTP status (408, 429, 500, 502, 503, 504 or 529) rejects with numeric `status` and, when the response sends `Retry-After-Ms` or `Retry-After`, `retryAfterMs` (whole milliseconds, at most one day) on the error object. For HTTP 429/529, back off; do not spin.
 
 ## Foreground and background
 
@@ -231,11 +231,17 @@ try {
   const decision = await jev.evaluate({ state, questions });
   if (decision.answers.action.confidence < 0.5) degraded = true;
   else frame = decision.answers.action.choice;
-} catch { degraded = true; }
+} catch (error) {
+  degraded = true;
+  const { status, retryAfterMs } = error as { status?: number; retryAfterMs?: number };
+  if (status === 429 || status === 529) backoffUntil = Date.now() + (retryAfterMs ?? 1000);
+}
 if (degraded) { frame = deterministicFallback(state); await program.emit({ fallback: true, frame }); }
 ```
 
-Confidence is neither truth nor authorization; a low-confidence answer is a reason to fall back, not a reason to act. Fabric validates the response before it returns it. An invalid choice, probability set, or confidence rejects the evaluation without surfacing a partial answer, so `catch` is part of the loop. The response's well-formed reported usage still counts against the run's evaluation and token budgets, and later evaluations proceed within them. A failure whose usage is unknown (a network or HTTP error, a timeout, or a response without valid usage) closes inference for the rest of the run, because it may have been billed.
+Skip `jev.evaluate` until `backoffUntil` passes, and keep applying the deterministic fallback meanwhile.
+
+Confidence is neither truth nor authorization; a low-confidence answer is a reason to fall back, not a reason to act. Fabric validates the response before it returns it. An invalid choice, probability set, or confidence rejects the evaluation without surfacing a partial answer, so `catch` is part of the loop. The response's well-formed reported usage still counts against the run's evaluation and token budgets, and later evaluations proceed within them. A transient HTTP error counts as one evaluation and bills the usage its body reports, or else a fixed cost of the request body's UTF-8 byte length as input tokens and 0 output tokens; later evaluations proceed within the budgets, so a guest that retries forever stops at `maxEvaluations` or `maxTokens`. This applies to the in-process transport; a failed request dispatched through jev-fabric has unknown usage. A failure whose usage is unknown (a network error, a timeout or cancellation, any other HTTP status, or a response without valid usage) closes inference for the rest of the run, because it may have been billed.
 
 ### Budget arithmetic for sustained loops
 

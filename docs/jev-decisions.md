@@ -123,7 +123,10 @@ the program's evaluation/token limits. Zero evaluations prohibit both. Usage is
 accounted even for malformed/refused provider responses; unknown usage blocks
 later inference and is never treated as free. A malformed legacy `jev.evaluate`
 answer with valid reported usage is counted and rejected, and later inference
-continues within the remaining budget. The final lossless response
+continues within the remaining budget. A legacy in-process transient HTTP error
+(408, 429, 500, 502, 503, 504 or 529) counts the same way, at the usage its body
+reports or else the request body's UTF-8 bytes as input tokens. `jev.decide`
+keeps its own native accounting: its result status and `budget` decide. The final lossless response
 remains inspectable when its reported tokens exceed the limit. No automatic
 HTTP retries occur.
 

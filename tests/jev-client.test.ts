@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { JevClient, JevCredentials } from "../src/jev/client.js";
 import { DEFAULT_JEV_CONFIG, normalizeJevConfig } from "../src/jev/config.js";
 import { JEV_OPENROUTER_ROUTE, JEV_TYPESAFE_ROUTE, JEV_VERCEL_ROUTE } from "../src/jev/routes.js";
-import { checkRequest, checkResponse, checkSchema, checkValue, JevInvalidResponseError } from "../src/jev/validation.js";
+import { checkRequest, checkResponse, checkSchema, checkValue, JevInvalidResponseError, JevTransientHttpError } from "../src/jev/validation.js";
 import type { JevRequest } from "../src/jev/types.js";
 const request: JevRequest = { state:{text:"Please refund this charge"}, questions:{route:{type:"choice",instructions:"Which team handles this?",criteria:{billing:null,other:null}}, yes:{type:"noul",instructions:"Is a refund requested?"}, score:{type:"score",instructions:"How urgent is the request?",criteria:["No urgency", "Explicit immediate deadline"]}} };
 const response = { model:"jev-latest", answers:{route:{type:"choice",choice:"billing",confidence:1,probabilities:{billing:1,other:0}},yes:{type:"noul",noul:0.98},score:{type:"score",score:0.1,confidence:0.9,probabilities:{"0":0.9,"1":0.1},legend:{"0":"No urgency","1":"Explicit immediate deadline"}}},usage:{input_tokens:30,output_tokens:10} };
@@ -36,6 +36,29 @@ describe("Jev transport and credentials", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     const fail = new JevClient(DEFAULT_JEV_CONFIG, (async () => { throw new Error("FAKE_SECRET"); }) as typeof fetch, new JevCredentials([], { TYPESAFE_API_KEY:"test-key" }));
     await expect(fail.evaluate(request, signal())).rejects.toThrow(/^Jev network request failed$/);
+  });
+  it("classifies only received transient HTTP statuses as billed retries", async () => {
+    const rejection = async (reply: Response) => {
+      let sent = "";
+      const client = new JevClient(DEFAULT_JEV_CONFIG, (async (_url: string, init: { body: string }) => { sent = init.body; return reply; }) as unknown as typeof fetch, new JevCredentials([], { TYPESAFE_API_KEY:"test-key" }));
+      return { error: await client.evaluate(request, signal()).catch((error: unknown) => error), bytes: Buffer.byteLength(sent) };
+    };
+    for (const status of [408, 429, 500, 502, 503, 504, 529]) {
+      const { error, bytes } = await rejection(new Response("FAKE_SECRET", { status }));
+      expect(error).toBeInstanceOf(JevTransientHttpError);
+      expect(error).toMatchObject({ status, usage: { input_tokens: bytes, output_tokens: 0 }, guestFields: { status } });
+      expect((error as Error).message).not.toContain("FAKE_SECRET");
+    }
+    for (const status of [400, 401, 403, 404, 409, 422]) {
+      const { error } = await rejection(new Response(JSON.stringify({ usage: { input_tokens: 1, output_tokens: 1 } }), { status }));
+      expect(error).toBeInstanceOf(Error); expect(error).not.toBeInstanceOf(JevTransientHttpError);
+    }
+    const reported = await rejection(new Response(JSON.stringify({ usage: { input_tokens: 4, output_tokens: 1 } }), { status: 502, headers: { "retry-after-ms": "1500.2", "retry-after": "9" } }));
+    expect(reported.error).toMatchObject({ usage: { input_tokens: 4, output_tokens: 1 }, retryAfterMs: 1501, guestFields: { status: 502, retryAfterMs: 1501 } });
+    const invalid = await rejection(new Response(JSON.stringify({ usage: { input_tokens: -4, output_tokens: 1 } }), { status: 503, headers: { "retry-after": "soon" } }));
+    expect(invalid.error).toMatchObject({ usage: { input_tokens: invalid.bytes, output_tokens: 0 }, retryAfterMs: undefined, guestFields: { status: 503 } });
+    const dated = await rejection(new Response("", { status: 429, headers: { "retry-after": new Date(Date.now() + 60_000).toUTCString() } }));
+    expect((dated.error as JevTransientHttpError).retryAfterMs).toBeGreaterThan(50_000);
   });
   it("bounds a fetch that does not cooperate with cancellation", async () => {
     const client=new JevClient({...DEFAULT_JEV_CONFIG,requestTimeoutMs:20},(()=>new Promise<Response>(()=>{})) as typeof fetch,new JevCredentials([],{TYPESAFE_API_KEY:"fake"}));
