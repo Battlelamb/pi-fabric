@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { JevClient, JevCredentials } from "../src/jev/client.js";
 import { DEFAULT_JEV_CONFIG, normalizeJevConfig } from "../src/jev/config.js";
 import { JEV_OPENROUTER_ROUTE, JEV_TYPESAFE_ROUTE, JEV_VERCEL_ROUTE } from "../src/jev/routes.js";
-import { checkRequest, checkResponse, checkSchema, checkValue } from "../src/jev/validation.js";
+import { checkRequest, checkResponse, checkSchema, checkValue, JevInvalidResponseError } from "../src/jev/validation.js";
 import type { JevRequest } from "../src/jev/types.js";
 const request: JevRequest = { state:{text:"Please refund this charge"}, questions:{route:{type:"choice",instructions:"Which team handles this?",criteria:{billing:null,other:null}}, yes:{type:"noul",instructions:"Is a refund requested?"}, score:{type:"score",instructions:"How urgent is the request?",criteria:["No urgency", "Explicit immediate deadline"]}} };
 const response = { model:"jev-latest", answers:{route:{type:"choice",choice:"billing",confidence:1,probabilities:{billing:1,other:0}},yes:{type:"noul",noul:0.98},score:{type:"score",score:0.1,confidence:0.9,probabilities:{"0":0.9,"1":0.1},legend:{"0":"No urgency","1":"Explicit immediate deadline"}}},usage:{input_tokens:30,output_tokens:10} };
@@ -91,6 +91,19 @@ describe("Jev transport and credentials", () => {
     const controller = new AbortController(); controller.abort();
     await expect(client.evaluate(request,controller.signal)).rejects.toThrow(); expect(fetcher).not.toHaveBeenCalled();
     await expect(client.evaluate(request,signal())).rejects.toThrow("oversized");
+    await expect(client.evaluate(request,signal())).rejects.not.toBeInstanceOf(JevInvalidResponseError);
+  });
+  it("keeps only well-formed reported usage when rejecting a malformed answer", async () => {
+    const malformed = { ...response, answers: { ...response.answers, yes: { type: "noul", noul: 2 } } };
+    const client = new JevClient(DEFAULT_JEV_CONFIG, (async () => new Response(JSON.stringify(malformed))) as unknown as typeof fetch, new JevCredentials([], { TYPESAFE_API_KEY:"test-key" }));
+    const rejected = await client.evaluate(request, signal()).catch((error: unknown) => error);
+    expect(rejected).toBeInstanceOf(JevInvalidResponseError);
+    expect(rejected).toMatchObject({ message: "TypeSafe returned an invalid or oversized typed response", usage: { input_tokens: 30, output_tokens: 10 } });
+    expect(rejected).not.toHaveProperty("answers");
+    for (const usage of [{ input_tokens: -1, output_tokens: 10 }, undefined]) {
+      const unknown = (() => { try { return checkResponse({ ...malformed, usage }, request); } catch (error) { return error; } })();
+      expect(unknown).toBeInstanceOf(Error); expect(unknown).not.toBeInstanceOf(JevInvalidResponseError);
+    }
   });
 });
 describe("Jev validation", () => {

@@ -7,7 +7,7 @@ import { FabricAutoApprovalClassifier } from "../core/auto-approval-classifier.j
 import type { FabricConfig } from "../config.js";
 import type { FabricInvocationContext } from "../protocol.js";
 import type { JevLaunch, JevRunInfo, JevJson, JevResponse } from "./types.js";
-import { checkSchema, checkValue, jsonText, object } from "./validation.js";
+import { checkSchema, checkValue, jsonText, object, JevInvalidResponseError } from "./validation.js";
 import { checkObserve, type JevObservationHost, type JevSubscription } from "./observation.js";
 import { decisionUsage } from "./decisions.js";
 import { DECISION_MAX_BYTES } from "./decision-profiles.js";
@@ -165,6 +165,12 @@ export class JevProgramManager {
       let evaluating = false;
       let inferenceBlocked = false;
       let reportedTokens = 0;
+      const accountInference = (response: { input: number | null; output: number | null; exhausted: boolean }) => {
+        info.usage.input_tokens = response.input === null || info.usage.input_tokens === null ? null : info.usage.input_tokens + response.input;
+        info.usage.output_tokens = response.output === null || info.usage.output_tokens === null ? null : info.usage.output_tokens + response.output;
+        reportedTokens += (response.input ?? 0) + (response.output ?? 0);
+        inferenceBlocked ||= response.exhausted || reportedTokens >= maxTokens;
+      };
       const audits: FabricCallAudit[] = [];
       const emit = (value: unknown) => {
         jsonText(value, 4096, "Program event");
@@ -226,13 +232,9 @@ export class JevProgramManager {
                 audits, maxResultChars: ref === "jev.decide" ? DECISION_MAX_BYTES : ref === "jev.evaluate" ? 1_048_576 : config.executor.maxNestedResultChars,
               });
               if (inference) {
-                const response = ref === "jev.decide" ? decisionUsage(value as DecisionResult) : {
+                accountInference(ref === "jev.decide" ? decisionUsage(value as DecisionResult) : {
                   input: (value as JevResponse).usage.input_tokens, output: (value as JevResponse).usage.output_tokens, exhausted: false,
-                };
-                info.usage.input_tokens = response.input === null || info.usage.input_tokens === null ? null : info.usage.input_tokens + response.input;
-                info.usage.output_tokens = response.output === null || info.usage.output_tokens === null ? null : info.usage.output_tokens + response.output;
-                reportedTokens += (response.input ?? 0) + (response.output ?? 0);
-                inferenceBlocked ||= response.exhausted || reportedTokens >= maxTokens;
+                });
                 accounted = true;
                 // Lossless calls retain even the final over-budget/error response.
                 // The next inference is blocked; deterministic inspection still works.
@@ -241,9 +243,19 @@ export class JevProgramManager {
               }
               return value;
             } catch (error) {
-              // A failed dispatch may still have billed. Do not let a guest catch
-              // it and start another inference with a fabricated zero usage count.
-              if (inference && !accounted) { inferenceBlocked = true; info.usage.input_tokens = null; info.usage.output_tokens = null; }
+              if (inference && !accounted) {
+                if (ref === "jev.evaluate" && error instanceof JevInvalidResponseError) {
+                  // A malformed answer with well-formed usage is billed, never surfaced,
+                  // and does not close inference: the guest may fall back and continue.
+                  accountInference({ input: error.usage.input_tokens, output: error.usage.output_tokens, exhausted: false });
+                  accounted = true;
+                  if (reportedTokens > maxTokens) return failBudget("Jev reported-token budget exhausted");
+                } else {
+                  // A failed dispatch may still have billed. Do not let a guest catch
+                  // it and start another inference with a fabricated zero usage count.
+                  inferenceBlocked = true; info.usage.input_tokens = null; info.usage.output_tokens = null;
+                }
+              }
               throw error;
             } finally {
               if (inference) evaluating = false;

@@ -235,7 +235,7 @@ try {
 if (degraded) { frame = deterministicFallback(state); await program.emit({ fallback: true, frame }); }
 ```
 
-Confidence is neither truth nor authorization; a low-confidence answer is a reason to fall back, not a reason to act. Fabric validates the response before it returns it. An invalid choice, probability set, or confidence rejects the evaluation without surfacing a partial answer, so `catch` is part of the loop.
+Confidence is neither truth nor authorization; a low-confidence answer is a reason to fall back, not a reason to act. Fabric validates the response before it returns it. An invalid choice, probability set, or confidence rejects the evaluation without surfacing a partial answer, so `catch` is part of the loop. The response's well-formed reported usage still counts against the run's evaluation and token budgets, and later evaluations proceed within them. A failure whose usage is unknown (a network or HTTP error, a timeout, or a response without valid usage) closes inference for the rest of the run, because it may have been billed.
 
 ### Budget arithmetic for sustained loops
 

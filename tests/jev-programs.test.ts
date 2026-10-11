@@ -100,6 +100,36 @@ describe("Jev reactive programs", () => {
     expect(run.state).toBe("failed"); expect(run.evaluations).toBe(1);
     expect(run.usage).toEqual({ input_tokens:3,output_tokens:2 }); expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it("counts a malformed answer's reported usage without surfacing it or blocking later inference", async () => {
+    const answers = [{ yes: { type: "noul", noul: 2 } }, { yes: { type: "noul", noul: 1 } }];
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ model:"jev-latest", answers:answers.shift(), usage:{input_tokens:3,output_tokens:2} }))) as unknown as typeof fetch;
+    const { provider } = setup({}, fetcher);
+    const request = "{state:'hello',questions:{yes:{type:'noul',instructions:'Is this a greeting?'}}}";
+    const run = await callProgram(provider, "run", launch(`let first = "answered";
+      try { await jev.evaluate(${request}); } catch (error) { first = String(error); }
+      return { first, second: (await jev.evaluate(${request})).answers.yes.noul };`, { requires: ["jev.evaluate"] }));
+    expect(run.state, run.error).toBe("completed");
+    expect(run.result).toEqual({ first: expect.stringContaining("invalid"), second: 1 });
+    expect(run.evaluations).toBe(2); expect(run.usage).toEqual({ input_tokens:6,output_tokens:4 });
+  });
+  it("blocks later inference when a failed request's usage is unknown", async () => {
+    const replies = [new Response("not json"), new Response("upstream", { status: 503 })];
+    for (const reply of replies) {
+      const fetcher = vi.fn(async () => reply) as unknown as typeof fetch;
+      const { provider } = setup({}, fetcher);
+      const request = "{state:'hello',questions:{yes:{type:'noul',instructions:'Is this a greeting?'}}}";
+      const run = await callProgram(provider, "run", launch(`try { await jev.evaluate(${request}); } catch {}
+        await jev.evaluate(${request}); return 1;`, { requires: ["jev.evaluate"] }));
+      expect(run).toMatchObject({ state: "failed", evaluations: 1, error: expect.stringContaining("budget"), usage: { input_tokens: null, output_tokens: null } });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    }
+  });
+  it("fails the run when a malformed answer's reported usage exceeds the token budget", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ model:"jev-latest", answers:{}, usage:{input_tokens:3,output_tokens:2} }))) as unknown as typeof fetch;
+    const { provider } = setup({}, fetcher);
+    const run = await callProgram(provider, "run", launch("try { await jev.evaluate({state:'x',questions:{yes:{type:'noul',instructions:'Is x present?'}}}); } catch {} return 1;", { requires:["jev.evaluate"], limits:{maxTokens:4} }));
+    expect(run).toMatchObject({ state: "failed", error: expect.stringContaining("token"), usage: { input_tokens: 3, output_tokens: 2 } });
+  });
   it("enforces reported-token budgets before answers can drive actions", async () => {
     const fetcher = vi.fn(async () => { await delay(20); return new Response(JSON.stringify({ model:"jev-latest", answers:{yes:{type:"noul",noul:1}},usage:{input_tokens:3,output_tokens:2} })); }) as unknown as typeof fetch;
     const { provider } = setup({}, fetcher);

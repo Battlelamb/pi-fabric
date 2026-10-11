@@ -3,7 +3,7 @@ import { runAbortable } from "../async-settlement.js";
 import type { FabricJevConfig } from "./config.js";
 import type { JevRequest, JevResponse } from "./types.js";
 import { JEV_TYPESAFE_ROUTE, resolveJevUpstreamModel, type JevRoute } from "./routes.js";
-import { checkRequest, checkResponse, jsonText } from "./validation.js";
+import { checkRequest, checkResponse, jsonText, JevInvalidResponseError } from "./validation.js";
 
 export interface JevCredentialSource {
   configured(): boolean;
@@ -118,8 +118,11 @@ export class JevClient {
         chunks.push(value);
       }
       return checkResponse(JSON.parse(Buffer.concat(chunks).toString("utf8")), request);
-    } catch {
-      throw new Error(timedSignal.aborted ? "Jev response cancelled or timed out" : `${this.route.label} returned an invalid or oversized typed response`);
+    } catch (error) {
+      if (timedSignal.aborted) throw new Error("Jev response cancelled or timed out");
+      const message = `${this.route.label} returned an invalid or oversized typed response`;
+      // Keep well-formed reported usage so the caller can bill a malformed answer.
+      throw error instanceof JevInvalidResponseError ? new JevInvalidResponseError(message, error.usage) : new Error(message);
     } finally { await reader.cancel().catch(() => undefined); }
   }
   close(): void { this.credentials.clear(); }
