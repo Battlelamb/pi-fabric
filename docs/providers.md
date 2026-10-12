@@ -278,7 +278,7 @@ Results from MCP, agent, memory, state, schema, mesh, components, compact, and e
 A proxied event carries:
 
 - `toolName` holding the fully qualified Fabric ref, such as `mcp.github.search`;
-- a `toolCallId` that starts with `FABRIC_NESTED_TOOL_CALL_ID_PREFIX`;
+- a `toolCallId` that starts with `FABRIC_NESTED_TOOL_CALL_ID_PREFIX`, persisted as `nestedToolCallId` on the call's audit in the final `fabric_exec` details;
 - text `content` holding the raw string result or a JSON projection;
 - `details` matching `FabricToolResultProxyDetailsV1`, whose `result` is the exact host-side structured value.
 
