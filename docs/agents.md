@@ -466,6 +466,31 @@ Fabric children may read these environment variables. They are stable and versio
 | `PI_FABRIC_SCOPE` | JSON `FabricScope` `{ version: 1, principal, grants, digest, parentDigest? }`. Present only when the parent is scoped: the inherited or narrowed scope. The worker always clears `PI_FABRIC_SCOPE_FILE`. A child Fabric reads it as its root scope and fails closed when it is malformed. See [principal and scope](providers.md#principal-and-scope). |
 | `PI_FABRIC_DEPTH` | Recursion depth of the child (the root is 0). |
 | `PI_FABRIC_AGENT_NAME` | The child's display name. |
+| `TRACEPARENT`, `TRACESTATE` | W3C Trace Context headers an extension supplied for this launch; see [child trace context](#child-trace-context). Without a reply the child keeps the values its worker inherited. |
+
+### Child trace context
+
+A child agent is its own process, so its telemetry joins the parent's trace only when the parent's trace context reaches its environment. Before each child launch and each relaunch (startup retry, resume), Fabric emits `FABRIC_CHILD_TRACE_CONTEXT_EVENT` (`pi-fabric:child-trace-context:v1`) on Pi's event bus, so a tracing extension can answer for that launch alone:
+
+```ts
+import {
+  FABRIC_CHILD_TRACE_CONTEXT_EVENT,
+  type FabricChildTraceContextRequestV1,
+} from "pi-fabric/protocol";
+
+pi.events.on(FABRIC_CHILD_TRACE_CONTEXT_EVENT, (value) => {
+  const request = value as FabricChildTraceContextRequestV1;
+  // parentToolCallId: the outer fabric_exec call. nestedToolCallId: the agents.* call.
+  const span = spanForToolCall(request.nestedToolCallId ?? request.parentToolCallId);
+  if (span) request.reply({ traceparent: traceparentOf(span), tracestate: tracestateOf(span) });
+});
+```
+
+The request is `{ version: 1, parentToolCallId?, nestedToolCallId?, runId?, runner, name, reply }`. `nestedToolCallId` is the id the call's [audit](audit-trace.md) and proxied `tool_result` carry. Actor turns have neither call id. A durable `agents.spawn` has no `runId`: the session asks before it hands the request to the resident host, which mints the id and reuses the answer for its own relaunches.
+
+`reply` must be called synchronously, before the listener's first `await`. The first valid reply wins. Fabric carries it to the worker beside the lineage (`--trace-context`), and the worker exports `TRACEPARENT` and `TRACESTATE` to the child, replacing both inherited values. That reaches every transport, including tmux, screen, LocalTerm, and Herdr sessions that start from the multiplexer's environment, and deferred handoffs that launch after `fabric_exec` returns. A relaunch that gets no reply keeps the context of the launch before it.
+
+A reply can set only those two headers. `traceparent` must be a lowercase W3C `version-traceid-parentid-flags` value with non-zero ids; `tracestate` is optional printable ASCII of at most 512 characters. `reply` throws on anything else, and on a call after the launch, so the mistake surfaces in the listener. A listener that throws never blocks a launch. With no reply Fabric sets nothing, and the child keeps whatever `TRACEPARENT` its worker inherited. Custom [runner adapters](#custom-runners) receive the context as `context.traceContext`.
 
 [Model-guidance components](components.md#model-facing-guidance-components) can target participants by canonical provider/model. Direct agents and actors retain their role prompt and receive matching append guidance after it. Recursive Pi children load the project components and resolve their own replaceable Fabric execution slot, so the parent does not duplicate guidance. Durable owners use the latest atomically committed guidance snapshot for each launch. Guidance changes prompts only; it cannot widen tools, approvals, or committed capabilities. Task text, message envelopes, run IDs, and timestamps stay out of the guidance system prompt, so repeated runs with the same role, model, and component projection retain a byte-stable prefix.
 

@@ -191,15 +191,19 @@ const runRequest = (
   manager: AgentManager,
   modelsConfig: FabricModelsConfig,
   options: {allowCwd?: boolean} = {},
-): AgentRunRequest => normalizeAgentRunRequest(
-  {...args, timeoutMs: longerTimeoutOverride(args.timeoutMs, manager)},
-  {
-    ...manager.config,
-    models: modelsConfig,
-    ...(context.extensionContext.model ? {inheritedModel: context.extensionContext.model} : {}),
-  },
-  options,
-);
+): AgentRunRequest => ({
+  ...normalizeAgentRunRequest(
+    {...args, timeoutMs: longerTimeoutOverride(args.timeoutMs, manager)},
+    {
+      ...manager.config,
+      models: modelsConfig,
+      ...(context.extensionContext.model ? {inheritedModel: context.extensionContext.model} : {}),
+    },
+    options,
+  ),
+  // Host-only: lets a trace-context listener parent the child under this call.
+  traceOrigin: {parentToolCallId: context.parentToolCallId, nestedToolCallId: context.nestedToolCallId},
+});
 
 const handoffTask = (args: Record<string, unknown>): string => {
   const task = typeof args.task === "string" ? args.task.trim() : "";
@@ -653,8 +657,12 @@ export class AgentsProvider implements FabricProvider {
             ? { thinkingBounds: this.manager.childThinkingBounds(request.thinkingBounds) }
             : {}),
         }, context.extensionContext.sessionManager?.getEntries?.() ?? []);
+        // The resident host loads no extensions: ask this session's and send the answer.
+        const traceContext = durableRequest.residency === "durable"
+          ? this.manager.forwardedTraceContext(durableRequest)
+          : undefined;
         const handle = durableRequest.residency === "durable"
-          ? await this.#resident().spawnAgent(durableRequest, context.signal)
+          ? await this.#resident().spawnAgent({ ...durableRequest, ...(traceContext ? { traceContext } : {}) }, context.signal)
           : await this.manager.spawn(durableRequest, context.signal);
         if (request.residency !== "durable") this.manager.detachSignal(handle.id);
         this.participants.scheduleRefresh();

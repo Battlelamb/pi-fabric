@@ -481,6 +481,7 @@ describe("agent scope narrowing", () => {
       resolvePythonRuntime: () => "monty",
       resolveCwd: (cwd: string) => cwd,
       childThinkingBounds: () => ({}),
+      forwardedTraceContext: () => undefined,
       detachSignal() {},
       spawn: async (request: unknown) => {
         requests.push(request);

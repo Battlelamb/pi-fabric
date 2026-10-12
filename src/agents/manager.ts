@@ -51,6 +51,11 @@ import {
   type InheritedSessionPin,
 } from "./session-pins.js";
 import { tokenUsagePayloadFromValue } from "../lifecycle/types.js";
+import {
+  readTraceContext,
+  type FabricChildTraceContextLaunch,
+  type FabricTraceContextV1,
+} from "./trace-context.js";
 import type { FabricTokenUsagePayload } from "../lifecycle/types.js";
 import { AgentAdmission, assertAgentTask, beginAgentSettlement, createAgentLifecycle, finishAgentSettlement, terminalAgentStatuses, type AgentLifecycleState } from "./lifecycle.js";
 import { removeTree } from "./rm.js";
@@ -187,6 +192,8 @@ export const resolveAgentCwd = (parentCwd: string, requestedCwd?: string): strin
 interface ManagedAgent extends AgentLifecycleState<AgentRunResult> {
   id: string;
   name: string;
+  /** Tool calls that started the run, offered again to trace-context listeners on relaunch. */
+  traceOrigin?: AgentRunRequest["traceOrigin"];
   task: string;
   runner: FabricAgentRunner;
   /** Capability facts frozen at launch; a later unregister does not change them. */
@@ -307,6 +314,21 @@ const retryablePiStartupError = (error: string | undefined): boolean =>
   /\b(?:no|missing)\s+(?:api key|credentials?)\b|\b(?:api key|credentials?)\s+(?:was\s+)?not found\b/i.test(
     error,
   );
+
+const checkedTraceContext = (request: AgentRunRequest): FabricTraceContextV1 | undefined => {
+  if (request.traceContext === undefined) return undefined;
+  const forwarded = readTraceContext(request.traceContext);
+  if (!forwarded) throw new Error("Invalid forwarded trace context");
+  return forwarded;
+};
+
+const traceOrigin = (origin: AgentRunRequest["traceOrigin"]): NonNullable<AgentRunRequest["traceOrigin"]> => ({
+  ...(typeof origin?.parentToolCallId === "string" ? { parentToolCallId: origin.parentToolCallId } : {}),
+  ...(typeof origin?.nestedToolCallId === "string" ? { nestedToolCallId: origin.nestedToolCallId } : {}),
+});
+
+const runName = (request: AgentRunRequest): string =>
+  safeName(request.name ?? request.task.split("\n", 1)[0] ?? "Fabric agent");
 
 const safeName = (value: string): string =>
   value
@@ -523,6 +545,9 @@ export class AgentManager {
   readonly #resolveInheritedSessionPins: (() => InheritedSessionPin[] | undefined) | undefined;
   readonly #thinkingBounds: (() => FabricThinkingBounds) | undefined;
   readonly #sessionId: (() => string | undefined) | undefined;
+  readonly #resolveChildTraceContext:
+    | ((launch: FabricChildTraceContextLaunch) => FabricTraceContextV1 | undefined)
+    | undefined;
   readonly #executorRuntime: (() => string | undefined) | undefined;
   /** This process's own confinement; children may only narrow it. */
   readonly #parentWritePolicy: FabricWritePolicy | undefined = readWritePolicy();
@@ -580,6 +605,8 @@ export class AgentManager {
       thinkingBounds?: () => FabricThinkingBounds;
       /** Caller Pi session id recorded as lineage parentSessionId. */
       sessionId?: () => string | undefined;
+      /** Asks the session's extensions for a child's W3C trace context before each launch and relaunch. */
+      resolveChildTraceContext?: (launch: FabricChildTraceContextLaunch) => FabricTraceContextV1 | undefined;
       /** Caller TypeScript executor runtime; native runtimes escape write confinement. */
       executorRuntime?: () => string | undefined;
     } = {},
@@ -614,6 +641,7 @@ export class AgentManager {
     this.#resolveInheritedSessionPins = options.resolveInheritedSessionPins;
     this.#thinkingBounds = options.thinkingBounds;
     this.#sessionId = options.sessionId;
+    this.#resolveChildTraceContext = options.resolveChildTraceContext;
     this.#executorRuntime = options.executorRuntime;
     this.#currentDepth = Math.max(0, Number(process.env.PI_FABRIC_DEPTH ?? "0") || 0);
     this.#fullCodeMode = options.fullCodeMode ?? true;
@@ -722,6 +750,23 @@ export class AgentManager {
       throw new Error(`Invalid inherited Fabric Python runtime: ${String(runtime)}`);
     }
     return runtime;
+  }
+
+  /**
+   * The trace context for a run this session hands to a host without its
+   * extensions. That host mints the run id, so listeners see none.
+   */
+  forwardedTraceContext(request: AgentRunRequest): FabricTraceContextV1 | undefined {
+    return this.#traceContext(request, { runner: request.runner ?? this.config.runner, name: runName(request) });
+  }
+
+  /** A forwarded context is used as is; otherwise the session's extensions are asked. */
+  #traceContext(
+    request: AgentRunRequest,
+    launch: Pick<FabricChildTraceContextLaunch, "runId" | "runner" | "name">,
+  ): FabricTraceContextV1 | undefined {
+    return checkedTraceContext(request) ??
+      this.#resolveChildTraceContext?.({ ...launch, ...traceOrigin(request.traceOrigin) });
   }
 
   spawn(request: AgentRunRequest, signal?: AbortSignal): Promise<AgentHandleInfo> {
@@ -834,6 +879,7 @@ export class AgentManager {
     }
     // Fail closed before admission or budget side effects.
     const scope = launchScope(request.scope, request.inheritedScope);
+    checkedTraceContext(request);
     const thinkingBounds = this.childThinkingBounds(request.thinkingBounds);
     const requiresFabricKernel = kernel === "python" || request.kernel === "typescript";
     let tools = this.#childTools(request, runnerAdapter, requiresFabricKernel);
@@ -879,7 +925,7 @@ export class AgentManager {
       throw error;
     }
     const id = randomUUID().replaceAll("-", "");
-    const name = safeName(request.name ?? request.task.split("\n", 1)[0] ?? "Fabric agent");
+    const name = runName(request);
     const runDirectory = path.join(this.#runRoot, id);
     fs.mkdirSync(runDirectory, { recursive: true });
     if (this.#managedTempRoot && !this.#retentionTimer) {
@@ -986,6 +1032,7 @@ export class AgentManager {
       const sessionExportFile = sessionExportDir
         ? sessionExportFileFor(sessionExportDir, agentCwd, id, new Date())
         : undefined;
+      const traceContext = this.#traceContext(request, { runId: id, runner, name });
       const launchContext: FabricRunnerLaunchContext = {
         id,
         name,
@@ -996,6 +1043,7 @@ export class AgentManager {
         deadlineAt: Date.now() + timeoutMs,
         depth: this.#currentDepth + 1,
         lineage,
+        ...(traceContext ? { traceContext } : {}),
         tools,
         ...(model ? { model } : {}),
         ...(thinking ? { thinking } : {}),
@@ -1120,6 +1168,7 @@ export class AgentManager {
         ...(scope ? ["--scope", JSON.stringify(scope)] : []),
         "--lineage",
         JSON.stringify(lineage),
+        ...(traceContext ? ["--trace-context", JSON.stringify(traceContext)] : []),
       ];
       const runnerLaunch = runnerAdapter.kind === "worker"
         ? await runnerAdapter.launch({
@@ -1192,6 +1241,7 @@ export class AgentManager {
           : {}),
         ...(request.capabilityDigest ? { capabilityDigest: request.capabilityDigest } : {}),
         ...(request.runnerSessionId ? { runnerSessionId: request.runnerSessionId } : {}),
+        ...(request.traceOrigin ? { traceOrigin: request.traceOrigin } : {}),
         ...(branch ? { branch } : {}),
         ...(worktree ? { worktree } : {}),
         settled: false,
@@ -1968,6 +2018,17 @@ export class AgentManager {
           "carry-over",
           JSON.stringify(resume.carryOver),
         );
+      }
+      // A relaunch is a new process: ask again, and keep the launch's context
+      // when nobody answers (a resident host has no listeners). A custom
+      // worker's argv is its own, so only Fabric's worker is updated.
+      if (BUILT_IN_RUNNER_IDS.has(managed.runner)) {
+        const traceContext = this.#resolveChildTraceContext?.({
+          runId: managed.id, runner: managed.runner, name: managed.name, ...traceOrigin(managed.traceOrigin),
+        });
+        if (traceContext) {
+          setWorkerArgument(managed.launch.workerArguments, "trace-context", JSON.stringify(traceContext));
+        }
       }
       // The relaunched child owns a fresh status/lifecycle pair, so drain what
       // the previous attempt published (token usage above all) before discarding

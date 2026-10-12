@@ -424,6 +424,11 @@ const main = async (): Promise<void> => {
       ...(options.runRoot ? { PI_FABRIC_RUN_ROOT: options.runRoot } : {}),
       // Supported child contract (docs/agents.md "Child environment contract").
       ...(options.lineage ? { PI_FABRIC_LINEAGE: options.lineage } : {}),
+      // An extension's reply replaces both headers; without one the child keeps
+      // whatever this worker inherited.
+      ...(options.traceContext
+        ? { TRACEPARENT: options.traceContext.traceparent, TRACESTATE: options.traceContext.tracestate }
+        : {}),
       ...(options.writePolicy ? { PI_FABRIC_WRITE_POLICY: options.writePolicy } : {}),
       // Exactly the manager's derived scope; undefined drops an inherited value.
       PI_FABRIC_SCOPE: options.scope,

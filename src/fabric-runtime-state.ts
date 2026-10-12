@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { resolveAgentDir } from "./core/agent-dir.js";
 import { loadHostSdk } from "./core/host-sdk.js";
+import { requestChildTraceContext } from "./agents/trace-context-request.js";
 import {
   resolveAvailablePiModel,
   type FabricModelCandidate,
@@ -743,6 +744,8 @@ export class FabricRuntimeState {
       onResultConsumed: (id) => completionInbox.acknowledge(id),
       onChildQuestion: (request) =>
         routeChildQuestion(request, { context, ...(this.#decisions ? { store: this.#decisions } : {}) }),
+      resolveChildTraceContext: (launch) =>
+        requestChildTraceContext((event, value) => this.pi.events?.emit(event, value), launch),
     });
     const canManageActor = (actorId: string): boolean | undefined => {
       const participant = this.#participants?.get(actorId);

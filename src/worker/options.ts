@@ -1,3 +1,4 @@
+import { readTraceContext } from "../agents/trace-context.js";
 import type { AgentRunCarryOver, AgentWorkerOptions } from "../agents/types.js";
 
 const argumentMap = (argv: readonly string[]): Map<string, string> => {
@@ -118,6 +119,16 @@ export const parseWorkerOptions = (
   const writePolicy = optional(args, "write-policy");
   const scope = optional(args, "scope");
   const lineage = optional(args, "lineage");
+  const traceContextSource = optional(args, "trace-context");
+  let traceContext: AgentWorkerOptions["traceContext"];
+  if (traceContextSource) {
+    try {
+      traceContext = readTraceContext(JSON.parse(traceContextSource));
+    } catch {
+      traceContext = undefined;
+    }
+    if (!traceContext) throw new Error("Invalid worker trace context");
+  }
   const maxTokens = optional(args, "max-tokens");
   const carryOverSource = optional(args, "carry-over");
   const runnerSessionId = optional(args, "runner-session-id");
@@ -220,6 +231,7 @@ export const parseWorkerOptions = (
     ...(writePolicy ? { writePolicy } : {}),
     ...(scope ? { scope } : {}),
     ...(lineage ? { lineage } : {}),
+    ...(traceContext ? { traceContext } : {}),
     ...(maxTokens ? { maxTokens: Number(maxTokens) } : {}),
     ...(carryOver ? { carryOver } : {}),
     ...(inheritedSessionPins && inheritedSessionPins.length > 0 ? { inheritedSessionPins } : {}),
