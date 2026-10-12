@@ -1,20 +1,13 @@
 import { readFileSync } from "node:fs";
 import { nativeToolResult } from "../core/native-tool-result.js";
 import path from "node:path";
-import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
-import {
-  createBashToolDefinition,
-  createEditToolDefinition,
-  createFindToolDefinition,
-  createGrepToolDefinition,
-  createLocalBashOperations,
-  createLsToolDefinition,
-  createReadToolDefinition,
-  type AgentToolResult,
-  type ExtensionContext,
-  type ExtensionRunner,
-  type ToolDefinition,
+import type {
+  AgentToolResult,
+  ExtensionContext,
+  ExtensionRunner,
+  ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { PiCodingAgent } from "../core/host-sdk-runtime.js";
 import { parseGitWorktreeAdd, tryExecuteGitWorktreeAdd } from "../agents/bash-worktree-add.js";
 import { runAbortable, throwIfAborted } from "../async-settlement.js";
 import { CapturedToolCatalog } from "../capture/catalog.js";
@@ -292,14 +285,14 @@ export class PiToolsProvider implements FabricProvider {
       ? new PowerShellCwdDefinitions(powerShellFactory)
       : undefined;
     this.#tools = this.#requireCapturedOverrides ? {} : {
-      read: createReadToolDefinition(cwd),
-      bash: createBashToolDefinition(cwd),
+      read: PiCodingAgent.createReadToolDefinition(cwd),
+      bash: PiCodingAgent.createBashToolDefinition(cwd),
       ...(powerShellFactory ? { powershell: powerShellFactory(cwd) } : {}),
-      edit: createEditToolDefinition(cwd),
+      edit: PiCodingAgent.createEditToolDefinition(cwd),
       write: createPreviewWriteToolDefinition(cwd),
-      grep: createGrepToolDefinition(cwd),
-      find: createFindToolDefinition(cwd),
-      ls: createLsToolDefinition(cwd),
+      grep: PiCodingAgent.createGrepToolDefinition(cwd),
+      find: PiCodingAgent.createFindToolDefinition(cwd),
+      ls: PiCodingAgent.createLsToolDefinition(cwd),
     };
     this.#catalog = catalog;
     this.#capturedTools = capturedTools;
@@ -490,12 +483,12 @@ export class PiToolsProvider implements FabricProvider {
             command: typeof args.command === "string" ? args.command : "", cwd, ownerId: job.options.ownerId,
             notify,
           })
-        : createLocalBashOperations(options?.shellPath !== undefined ? { shellPath: options.shellPath } : undefined);
+        : PiCodingAgent.createLocalBashOperations(options?.shellPath !== undefined ? { shellPath: options.shellPath } : undefined);
       const operations = middleware ? middleware.wrapOperations(local) : local;
       if (!operations || typeof operations.exec !== "function") {
         throw new Error("Invalid Fabric bash middleware operations; refusing to bypass shell protection");
       }
-      return createBashToolDefinition(cwd, {
+      return PiCodingAgent.createBashToolDefinition(cwd, {
         ...options,
         operations: trackShellOperations(operations, job, "bash"),
       });

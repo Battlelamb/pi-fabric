@@ -30,6 +30,16 @@ loads of optional **third-party** dependencies preserve behavior. Do not use
 this escape hatch for Pi host APIs: lazy UI must use the supplied host interfaces.
 Keep package-local dynamic entry paths stable across installed generations.
 
+Never import `@earendil-works/pi-coding-agent` by name at runtime outside the
+durable worker. Pi's loader tries a native import first and maps host packages
+only when that fails, and managed installs omit host peers: a bare import in a
+natively loaded lazy module has nothing on disk to resolve (#241). Use
+`import type`, `loadHostSdk()` from `src/core/host-sdk.ts`, or `PiCodingAgent`
+from `src/core/host-sdk-runtime.ts` where a lazy module needs SDK values
+synchronously. The artifact check enforces this, and
+`tests/managed-install-host-sdk.test.ts` runs the real CLI against an install
+without host peers.
+
 When touching startup, run `bun run build` (the artifact check guards the whole
 static closure and optional dependencies), `bun run assert:lazy-graph`, and
 cold-import/idle plus first-use tests. Review shared chunks too: code splitting

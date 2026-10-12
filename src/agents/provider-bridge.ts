@@ -142,7 +142,7 @@ export async function resolveExtensionProviders(
 ): Promise<ExtensionProviderRegistrations | undefined> {
   const key = parseModelKey(options.model);
   if (!key) return undefined;
-  const pi = sdk ?? await import("@earendil-works/pi-coding-agent");
+  const pi = sdk ?? await loadHostSdk();
   const models = await pi.ModelRuntime.create({
     authPath: path.join(options.agentDir, "auth.json"),
     modelsPath: path.join(options.agentDir, "models.json"),

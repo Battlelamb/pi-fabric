@@ -1,5 +1,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { resolveAgentDir } from "./core/agent-dir.js";
+import { loadHostSdk } from "./core/host-sdk.js";
 import {
   resolveAvailablePiModel,
   type FabricModelCandidate,
@@ -717,7 +718,7 @@ export class FabricRuntimeState {
         const { model } = resolveParticipantPiModel(modelKey);
         // Load host settings only for an actual compacted handoff. Project
         // trust does not transfer implicitly to a different working directory.
-        const { SettingsManager } = await import("@earendil-works/pi-coding-agent");
+        const { SettingsManager } = await loadHostSdk();
         const settings = SettingsManager.create(cwd, resolveAgentDir(), {
           projectTrusted: !this.#managedHost && cwd === context.cwd && context.isProjectTrusted(),
         }).getCompactionSettings(model);

@@ -11,7 +11,7 @@ import fabricProviderBridge, {
   PROVIDER_BRIDGE_MODEL_ENV,
   resolveExtensionProviders,
 } from "../src/agents/provider-bridge.js";
-import { hostBundleSdkEntry, loadHostSdk } from "../src/core/host-sdk.js";
+import { hostBundleSdkEntry, hostSdkEntry, loadHostSdk } from "../src/core/host-sdk.js";
 
 const roots: string[] = [];
 afterAll(() => {
@@ -130,6 +130,14 @@ describe("extension provider bridge", () => {
       expect(hostBundleSdkEntry(host)).toBeUndefined();
     }
     expect((await loadHostSdk(path.join(pkg, "dist", "cli.js"))).DefaultResourceLoader).toBe(DefaultResourceLoader);
+
+    // The running CLI's own entry, never a package lookup: managed installs have no host SDK on disk beside Fabric.
+    expect(hostSdkEntry(path.join(bundle, "cli.js"))).toBe(path.join(bundle, "index.js"));
+    expect(hostSdkEntry(path.join(pkg, "dist", "cli.js"))).toBe(path.join(pkg, "dist", "index.js"));
+    for (const host of [path.resolve("src/durable/worker.ts"), path.join(lookalike, "cli.js"),
+      path.join(lookalike, "..", "cli.js"), path.join(bundle, "missing", "cli.js"), undefined]) {
+      expect(hostSdkEntry(host)).toBeUndefined();
+    }
   });
 
   it("registers only the named extension's provider and runs no other extension", async () => {
