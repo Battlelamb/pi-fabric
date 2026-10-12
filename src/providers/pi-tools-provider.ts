@@ -592,14 +592,19 @@ export class PiToolsProvider implements FabricProvider {
     const logPath = await job.persistLog();
     const pid = await job.readPid();
     const elapsedMs = Date.now() - job.startedAt;
+    // A short command can end before this hand-off returns: say so.
+    const exited = job.finished ? { exitCode: job.exitCode ?? null } : undefined;
     const notice = formatShellHangNotice({
       elapsedMs,
       logPath,
       ...(pid !== undefined ? { pid } : {}),
+      ...exited,
     });
     const durableNotice = job.durable ? ` Durable: owned by the jev-fabric store at ${job.durable.home}; it keeps running if Pi exits and reattaches to this session on resume. Stop it explicitly with tasks.stop when no longer needed.` : "";
     const output = appendShellHangNotice(job.snapshotText(), `${notice}\n[Task ${job.id}; /fabric tasks or tools.call({ref:"tasks.get",args:{id:"${job.id}"}}). ${monitor?.delivery === "ui" ? "UI-only monitor: will not wake the agent." : "Completion will notify this session; do not poll."}${durableNotice}]`);
-    context.update(`${name}: still running after ${Math.max(1, Math.round(elapsedMs / 1000))}s`);
+    context.update(exited
+      ? `${name}: ${exited.exitCode === null ? "ended" : `exited with code ${exited.exitCode}`} in the background`
+      : `${name}: still running after ${Math.max(1, Math.round(elapsedMs / 1000))}s`);
     return {
       content: [{ type: "text", text: output }],
       details: {
