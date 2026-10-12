@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createModels, InMemoryCredentialStore, type AuthInteraction } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createJevAuthProvider, registerJevAuth } from "../src/jev/auth.js";
+import { createJevAuthProvider, createSubqAuthProvider, registerJevAuth } from "../src/jev/auth.js";
 import { JevCredentials } from "../src/jev/client.js";
 describe("Jev native login", () => {
   it("registers for login without publishing a text-generating model", () => {
@@ -11,6 +11,18 @@ describe("Jev native login", () => {
     expect(provider.auth.apiKey.login).toBeTypeOf("function");
     expect(() => provider.stream()).toThrow("not chat generation");
     expect(() => provider.streamSimple()).toThrow("not chat generation");
+  });
+  it("registers SubQ for login the same way, with its own key variable", async () => {
+    const registerProvider = vi.fn(); registerJevAuth({registerProvider} as unknown as ExtensionAPI);
+    expect(registerProvider.mock.calls.map(call => call[0].id)).toEqual(["jev", "subq"]);
+    const provider = registerProvider.mock.calls[1]![0];
+    expect(provider.getModels()).toEqual([]);
+    expect(() => provider.stream()).toThrow("not chat generation");
+    const storage = new InMemoryCredentialStore();
+    const models = createModels({ credentials: storage }); models.setProvider(createSubqAuthProvider());
+    await models.login("subq","api_key",{prompt: vi.fn(async () => "fake-subq-key")} as unknown as AuthInteraction);
+    expect(await storage.read("subq")).toEqual({type:"api_key",key:"fake-subq-key"});
+    expect(await storage.read("jev")).toBeUndefined();
   });
   it("persists api_key credentials through Pi storage and resolves login/logout", async () => {
     const storage = new InMemoryCredentialStore();

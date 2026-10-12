@@ -958,7 +958,7 @@ export class FabricRuntimeState {
             }, { deliverAs: advice.delivery, triggerTurn: advice.triggerTurn });
           }) : undefined;
           this.#jevObservationHost = observationHost;
-          // A bare `jev.model` alias stays on TypeSafe; `typesafe/...` / `~typesafe/...` uses OpenRouter decisions, and `typesafe-ai/...` uses Vercel AI Gateway.
+          // A bare `jev.model` alias stays on TypeSafe; `typesafe/...` / `~typesafe/...` uses OpenRouter decisions, `typesafe-ai/...` uses Vercel AI Gateway, and `subq-...` uses SubQ.
           const jevRoute = resolveJevModelRoute(this.#config!.jev.model).route;
           const provider = new JevProvider({
             registry: this.#registry!, config: this.#config!, observationHost,
