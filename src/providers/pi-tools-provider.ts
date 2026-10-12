@@ -729,6 +729,7 @@ export class PiToolsProvider implements FabricProvider {
       type: "tool_call",
       toolName: name,
       toolCallId: context.nestedToolCallId,
+      parentToolCallId: context.parentToolCallId,
       input: args,
     }));
     context.updateArguments?.(args);
@@ -755,9 +756,13 @@ export class PiToolsProvider implements FabricProvider {
     preflightEmitted = false,
   ): Promise<unknown> {
     const toolCallId = context.nestedToolCallId;
+    // Pi's own nested calls name their caller on every event; so do these replays,
+    // so a listener can tell which of several open fabric_exec calls issued one.
+    const parentToolCallId = context.parentToolCallId;
     await runAbortable(context.signal, () => runner.emit({
       type: "tool_execution_start",
       toolCallId,
+      parentToolCallId,
       toolName: name,
       args,
     }));
@@ -781,6 +786,7 @@ export class PiToolsProvider implements FabricProvider {
               runAbortable(context.signal, () => runner.emit({
                 type: "tool_execution_update",
                 toolCallId,
+                parentToolCallId,
                 toolName: name,
                 args,
                 partialResult,
@@ -815,6 +821,7 @@ export class PiToolsProvider implements FabricProvider {
       type: "tool_result",
       toolName: name,
       toolCallId,
+      parentToolCallId,
       input: args,
       content: result.content,
       details: result.details,
@@ -842,6 +849,7 @@ export class PiToolsProvider implements FabricProvider {
     await runAbortable(context.signal, () => runner.emit({
       type: "tool_execution_end",
       toolCallId,
+      parentToolCallId,
       toolName: name,
       result,
       isError,

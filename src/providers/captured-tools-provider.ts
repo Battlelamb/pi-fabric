@@ -190,9 +190,12 @@ export class CapturedToolsProvider implements FabricProvider {
       return asInvocationResult(entry, outcome.result, outcome.isError);
     }
     const toolCallId = context.nestedToolCallId;
+    // As Pi's native nested path does, name the caller on every replayed event.
+    const parentToolCallId = context.parentToolCallId;
     await runAbortable(context.signal, () => runner.emit({
       type: "tool_execution_start",
       toolCallId,
+      parentToolCallId,
       toolName: entry.name,
       args,
     }));
@@ -207,6 +210,7 @@ export class CapturedToolsProvider implements FabricProvider {
         type: "tool_call",
         toolName: entry.name,
         toolCallId,
+        parentToolCallId,
         input: args,
       }));
       context.updateArguments?.(args);
@@ -229,6 +233,7 @@ export class CapturedToolsProvider implements FabricProvider {
             runAbortable(context.signal, () => runner.emit({
               type: "tool_execution_update",
               toolCallId,
+              parentToolCallId,
               toolName: entry.name,
               args,
               partialResult,
@@ -259,6 +264,7 @@ export class CapturedToolsProvider implements FabricProvider {
       type: "tool_result",
       toolName: entry.name,
       toolCallId,
+      parentToolCallId,
       input: args,
       content: result.content,
       details: result.details,
@@ -279,6 +285,7 @@ export class CapturedToolsProvider implements FabricProvider {
     await runAbortable(context.signal, () => runner.emit({
       type: "tool_execution_end",
       toolCallId,
+      parentToolCallId,
       toolName: entry.name,
       result,
       isError,
