@@ -319,6 +319,8 @@ export interface FabricMeshConfig {
   actorQueueLimit: number;
   eventContextChars: number;
   actorContextEntries: number;
+  /** Tell a root session's model when other root sessions join or leave the project. */
+  peerNotices: boolean;
 }
 
 interface FabricRepairsConfig {
@@ -596,6 +598,7 @@ export const DEFAULT_FABRIC_CONFIG: FabricConfig = {
     actorQueueLimit: 32,
     eventContextChars: 40_000,
     actorContextEntries: 14,
+    peerNotices: true,
   },
   models: {
     aliases: {},
@@ -1394,6 +1397,7 @@ export const normalizeFabricConfig = (input: Record<string, unknown>): FabricCon
         1,
         100,
       ),
+      peerNotices: booleanValue(mesh.peerNotices, DEFAULT_FABRIC_CONFIG.mesh.peerNotices),
     },
     models: {
       aliases: normalizeModelAliases(modelsSection.aliases),

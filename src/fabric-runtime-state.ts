@@ -133,6 +133,7 @@ import {
 } from "./protocol.js";
 import { AgentManager } from "./agents/manager.js";
 import { AgentCompletionInbox } from "./agents/completion-inbox.js";
+import { PeerPresenceNotifier } from "./topology/peer-presence.js";
 import { ShellEventInbox } from "./core/shell-inbox.js";
 import { FabricShellTimingBridge } from "./core/shell-timing.js";
 import { readFabricBashMiddleware } from "./core/shell-middleware.js";
@@ -192,6 +193,7 @@ export class FabricRuntimeState {
   #speculation: RuntimeStateSpeculation | undefined;
   #agents: AgentManager | undefined;
   #completionInbox: AgentCompletionInbox | undefined;
+  #peerPresence: PeerPresenceNotifier | undefined;
   #shellInbox: ShellEventInbox | undefined;
   #shellTiming: FabricShellTimingBridge | undefined;
   #actors: ActorDirectory | undefined;
@@ -935,6 +937,14 @@ export class FabricRuntimeState {
         );
       }
     }
+    // Children are coordinated by their parent; only a root is told about peers.
+    if (mainAgent.local && this.#config.mesh.enabled) {
+      this.#peerPresence = new PeerPresenceNotifier(this.pi, context, {
+        peers: () => this.peerInfos(),
+        enabled: () => this.#config?.mesh.peerNotices === true,
+        cwd: context.cwd,
+      });
+    }
     this.#lifecycle.start();
     this.#residency?.start();
     await builtins.install(createProviderComponent({
@@ -1449,6 +1459,8 @@ export class FabricRuntimeState {
   async shutdown(): Promise<void> {
     this.#completionInbox?.close();
     this.#completionInbox = undefined;
+    this.#peerPresence?.close();
+    this.#peerPresence = undefined;
     this.#shellInbox?.close();
     this.#shellInbox = undefined;
     this.#shellTiming?.close();
