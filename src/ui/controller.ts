@@ -76,6 +76,9 @@ export class FabricUiController {
   #widget: FabricWidget | undefined;
   /** Component that had focus before the widget took it (normally the editor). */
   #widgetReturnFocus: Component | undefined;
+  /** Pi's hideThinkingBlock for the widget pane; read once, at the first expansion. */
+  #widgetHideThinking: boolean | undefined;
+  #widgetHideThinkingLoad: Promise<void> | undefined;
   #lastRefreshErrorAt = 0;
   #lastRefreshAt = 0;
   #dashboardOpen = false;
@@ -145,6 +148,11 @@ export class FabricUiController {
     if (this.#scheduledRefresh) clearTimeout(this.#scheduledRefresh);
     this.#timer = undefined;
     this.#scheduledRefresh = undefined;
+    // Hand focus back before the widget goes away, and drop the editor of this session.
+    this.#releaseWidget();
+    this.#widgetReturnFocus = undefined;
+    this.#widgetHideThinking = undefined;
+    this.#widgetHideThinkingLoad = undefined;
     this.#widget = undefined;
     this.#activityUnsubscribe?.();
     this.#activityUnsubscribe = undefined;
@@ -201,11 +209,34 @@ export class FabricUiController {
     tui.requestRender();
   }
 
-  #releaseWidget(): void {
+  /** Return focus to the editor; a `forward` key the widget did not use goes to the editor too. */
+  #releaseWidget(forward?: string): void {
     const tui = this.#widgetTui;
     if (!tui || !this.#widget?.focused) return;
-    tui.setFocus(this.#widgetReturnFocus ?? null);
+    const target = this.#widgetReturnFocus;
+    tui.setFocus(target ?? null);
+    if (forward !== undefined) target?.handleInput?.(forward);
     tui.requestRender();
+  }
+
+  /** Read Pi's hideThinkingBlock off the startup path, then redraw the pane. */
+  #widgetHidesThinking(context: ExtensionContext, tui: TUI): boolean {
+    if (this.#widgetHideThinking !== undefined) return this.#widgetHideThinking;
+    const epoch = this.#epoch;
+    this.#widgetHideThinkingLoad ??= (async () => {
+      let hidden = false;
+      try {
+        const { loadHostSdk } = await import("../core/host-sdk.js");
+        const { SettingsManager } = await loadHostSdk();
+        hidden = SettingsManager.create(context.cwd, resolveAgentDir(), { projectTrusted: context.isProjectTrusted?.() ?? false })
+          .getHideThinkingBlock();
+      } catch { /* no host settings: show thinking, as Pi does by default */ }
+      if (epoch !== this.#epoch) return;
+      this.#widgetHideThinking = hidden;
+      tui.requestRender();
+    })();
+    // Until the setting is known, show the marker only: never flash reasoning a user hid.
+    return true;
   }
 
   async openTasks(context: ExtensionContext, query?: string): Promise<void> {
@@ -854,8 +885,9 @@ export class FabricUiController {
                   : this.#snapshot.agents.find((agent) => agent.id === row.id);
                 return target ? this.#widgetTranscripts.read(this.#transcriptSource(target)) : undefined;
               },
-              release: () => this.#releaseWidget(),
+              release: (forward) => this.#releaseWidget(forward),
               requestRender: () => tui.requestRender(),
+              hideThinking: () => this.#widgetHidesThinking(context, tui),
             },
           );
           return this.#widget;

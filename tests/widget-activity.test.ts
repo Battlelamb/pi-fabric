@@ -57,22 +57,40 @@ const transcript = (): FabricAgentTranscript =>
     { type: "tool_execution_start", toolCallId: "t1", toolName: "read", args: { path: "src/a.ts" } },
   ]);
 
-const setup = () => {
-  const current = snapshot();
+const setup = (options: { current?: FabricDashboardSnapshot; terminalRows?: number; hideThinking?: boolean; activity?: () => FabricAgentTranscript } = {}) => {
+  const current = options.current ?? snapshot();
   const reads: FabricWidgetRow[] = [];
+  const forwarded: string[] = [];
   let released = 0;
-  const widget = new FabricWidget(theme, () => current, 6, () => 40, undefined, {
+  const widget = new FabricWidget(theme, () => current, 6, () => options.terminalRows ?? 40, undefined, {
     activity: (row) => {
       reads.push(row);
-      return transcript();
+      return (options.activity ?? transcript)();
     },
-    release: () => {
+    release: (forward) => {
       released++;
+      if (forward !== undefined) forwarded.push(forward);
       widget.focused = false;
     },
     requestRender: () => {},
+    ...(options.hideThinking === undefined ? {} : { hideThinking: () => options.hideThinking! }),
   });
-  return { widget, reads, released: () => released };
+  return { widget, reads, forwarded, released: () => released };
+};
+
+const longTranscript = (): FabricAgentTranscript =>
+  projectAgentTranscript(Array.from({ length: 40 }, (_, index) => ({
+    type: "tool_execution_start",
+    toolCallId: `t${index}`,
+    toolName: "read",
+    args: { path: `src/file-${index}.ts` },
+  })));
+
+const manyAgents = (count: number): FabricDashboardSnapshot => {
+  const current = snapshot() as FabricDashboardSnapshot & { agents: FabricUiAgent[]; actors: unknown[] };
+  current.agents = Array.from({ length: count }, (_, index) => agent(`agent-${index}`, `agent-${index}`));
+  current.actors = [];
+  return current;
 };
 
 describe("Fabric widget activity expansion", () => {
@@ -139,6 +157,72 @@ describe("Fabric widget activity expansion", () => {
     for (const width of [30, 60, 120]) {
       expect(widget.render(width).every((line) => visibleWidth(line) <= width)).toBe(true);
     }
+  });
+
+  it("hands a key it does not use back to the editor with focus", () => {
+    const { widget, forwarded, released } = setup();
+    widget.focused = true;
+    widget.selectDefault();
+    widget.handleInput("x");
+    expect(released()).toBe(1);
+    expect(forwarded).toEqual(["x"]);
+    // Ctrl+C lives in Pi's editor, so it must reach it too.
+    widget.focused = true;
+    widget.handleInput("\x03");
+    expect(forwarded).toEqual(["x", "\x03"]);
+  });
+
+  it("a click outside the participant rows does not take focus", () => {
+    const { widget } = setup();
+    const lines = widget.render(100);
+    const header = { type: "click", button: "left", x: 1, y: 0, screenX: 1, screenY: 0, width: 100, height: lines.length, shift: false, alt: false, ctrl: false } as const;
+    expect(widget.handleMouse(header)).toBeUndefined();
+    expect(widget.expandedId).toBeUndefined();
+  });
+
+  it("keeps an expanded widget inside its terminal share", () => {
+    for (const terminalRows of [12, 24, 50]) {
+      const { widget } = setup({ terminalRows, activity: longTranscript });
+      widget.focused = true;
+      widget.selectDefault();
+      widget.handleInput("\r");
+      const lines = widget.render(100);
+      expect(lines.length).toBeLessThanOrEqual(Math.max(7, Math.floor(terminalRows * 0.5)));
+      expect(lines.join("\n")).toContain("activity");
+    }
+  });
+
+  it("selects only the rows the widget shows", () => {
+    const { widget } = setup({ current: manyAgents(12) });
+    const shown = widget.render(100);
+    widget.focused = true;
+    widget.selectDefault();
+    for (let index = 0; index < 20; index++) widget.handleInput("\x1b[B");
+    widget.handleInput("\r");
+    const lastShown = shown.map((line) => /agent-(\d+)/.exec(line)?.[1]).filter(Boolean).at(-1);
+    expect(widget.expandedId).toBe(`agent-${lastShown}`);
+  });
+
+  it("keeps the thinking marker and drops its text when Pi hides thinking", () => {
+    const { widget } = setup({ hideThinking: true });
+    widget.focused = true;
+    widget.selectDefault();
+    widget.handleInput("\r");
+    const expanded = widget.render(100).join("\n");
+    expect(expanded).toContain("thinking");
+    expect(expanded).not.toContain("new branch state");
+  });
+
+  it("finishes the thinking of a reply that did not stream and keeps it for retained sessions", () => {
+    const streamed = projectAgentTranscript([
+      { type: "message_end", message: { role: "assistant", content: [{ type: "thinking", thinking: "plan" }, { type: "text", text: "done" }] } },
+    ]).entries;
+    expect(streamed.find((entry) => entry.kind === "thinking")).toMatchObject({ text: "plan", status: "completed" });
+    const retained = projectAgentTranscript([
+      { type: "message", message: { role: "assistant", content: [{ type: "thinking", thinking: "first" }, { type: "text", text: "a" }] } },
+      { type: "message", message: { role: "assistant", content: [{ type: "thinking", thinking: "second" }, { type: "text", text: "b" }] } },
+    ]).entries.filter((entry) => entry.kind === "thinking");
+    expect(retained.map((entry) => [entry.text, entry.status])).toEqual([["first", "completed"], ["second", "completed"]]);
   });
 
   it("stays passive without interaction wiring", () => {

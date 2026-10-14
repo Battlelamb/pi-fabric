@@ -34,7 +34,7 @@ const tailLines = (text: string, width: number, count: number): string[] => {
   return wrapped.slice(-count);
 };
 
-const entryLines = (theme: Theme, entry: FabricTranscriptEntry, width: number): string[] => {
+const entryLines = (theme: Theme, entry: FabricTranscriptEntry, width: number, hideThinking: boolean): string[] => {
   const inner = Math.max(1, width - 4);
   const body = (text: string | undefined, color: "dim" | "muted"): string[] =>
     text ? tailLines(safeText(text), inner, ENTRY_TEXT_LINES).map((line) => `    ${theme.fg(color, line)}`) : [];
@@ -42,7 +42,8 @@ const entryLines = (theme: Theme, entry: FabricTranscriptEntry, width: number): 
     case "thinking":
       return [
         `  ${theme.fg("dim", entry.status === "running" ? "∴ thinking…" : "∴ thinking")}`,
-        ...body(entry.text, "dim"),
+        // Pi's hideThinkingBlock keeps the marker and drops the reasoning text, as in its own chat.
+        ...(hideThinking ? [] : body(entry.text, "dim")),
       ];
     case "tool": {
       const args = oneLine(entry.text);
@@ -66,7 +67,7 @@ const entryLines = (theme: Theme, entry: FabricTranscriptEntry, width: number): 
 /**
  * Activity lines for an expanded widget participant, newest at the bottom.
  * `scroll` counts lines back from the newest; the caller clamps it with the
- * returned `maxScroll`.
+ * returned `maxScroll`. `hideThinking` mirrors Pi's hideThinkingBlock setting.
  */
 export const widgetActivityLines = (
   theme: Theme,
@@ -74,11 +75,12 @@ export const widgetActivityLines = (
   width: number,
   rows: number,
   scroll: number,
+  hideThinking = false,
 ): { lines: string[]; maxScroll: number } => {
   if (!transcript || transcript.entries.length === 0) {
     return { lines: [`  ${theme.fg("dim", "Waiting for activity…")}`], maxScroll: 0 };
   }
-  const all = transcript.entries.flatMap((entry) => entryLines(theme, entry, width));
+  const all = transcript.entries.flatMap((entry) => entryLines(theme, entry, width, hideThinking));
   const maxScroll = Math.max(0, all.length - rows);
   const offset = Math.max(0, Math.min(scroll, maxScroll));
   const end = all.length - offset;

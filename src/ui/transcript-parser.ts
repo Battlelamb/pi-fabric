@@ -215,6 +215,10 @@ export class TranscriptAccumulator {
     }
     if (message.role === "assistant") {
       const error = messageError(message);
+      // A retained message is complete: close any streamed reasoning, then keep this one's as its own entry.
+      this.#finishThinking("completed");
+      this.#trackThinking(id, message.content);
+      this.#finishThinking(error ? "failed" : "completed");
       const text = contentText(message.content);
       if (text) this.#pushMessage("assistant", id, text, error ? "failed" : "completed");
       if (error) {
@@ -456,8 +460,10 @@ export class TranscriptAccumulator {
         this.#finishAssistant("completed");
         return;
       }
-      if (!this.#assistant) this.#pushMessage("assistant", id, text);
-      else {
+      if (!this.#assistant) {
+        this.#pushMessage("assistant", id, text);
+        this.#finishThinking("completed");
+      } else {
         this.#assistant.text = clip(text, MAX_TRANSCRIPT_MESSAGE_CHARS);
         this.#finishAssistant("completed");
       }

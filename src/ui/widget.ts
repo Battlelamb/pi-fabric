@@ -87,8 +87,13 @@ export interface FabricWidgetRow {
 export interface FabricWidgetInteraction {
   /** Live activity for an expanded row, read from the participant's event log. */
   activity: (row: FabricWidgetRow) => FabricAgentTranscript | undefined;
-  /** Return focus to the editor. */
-  release: () => void;
+  /**
+   * Return focus to the editor. `forward` is a key the widget does not use; the
+   * editor receives it, because Pi handles Ctrl+C and extension shortcuts there.
+   */
+  release: (forward?: string) => void;
+  /** Pi's hideThinkingBlock: the pane keeps the thinking marker and drops its text. */
+  hideThinking?: () => boolean;
   /** Ask the host to redraw (selection and expansion change without a snapshot change). */
   requestRender: () => void;
 }
@@ -160,6 +165,19 @@ export const widgetRowLimit = (maxRows: number, terminalRows?: number): number =
   return Math.max(1, Math.min(configured, paneShare));
 };
 
+/**
+ * Row budget while an activity pane is open. Expanding is an explicit request
+ * for more room, so the widget may use its whole terminal share instead of
+ * `maxRows`, but never more than that share.
+ */
+export const widgetExpandedRowLimit = (maxRows: number, terminalRows?: number): number => {
+  const limit = widgetRowLimit(maxRows, terminalRows);
+  if (terminalRows === undefined || !Number.isFinite(terminalRows) || terminalRows <= 0) {
+    return limit + 2 + WIDGET_ACTIVITY_ROWS;
+  }
+  return Math.max(limit, Math.floor(terminalRows * WIDGET_TERMINAL_ROW_SHARE));
+};
+
 export class FabricWidget implements Component, Focusable {
   constructor(
     readonly theme: Theme,
@@ -178,6 +196,7 @@ export class FabricWidget implements Component, Focusable {
   #expandedId: string | undefined;
   #activityScroll = 0;
   #activityMaxScroll = 0;
+  #paneRows = WIDGET_ACTIVITY_ROWS;
   /** Participant rows of the last render, with their line index in the output. */
   #rows: Array<FabricWidgetRow & { line: number }> = [];
   #renderedFocus = false;
@@ -191,7 +210,7 @@ export class FabricWidget implements Component, Focusable {
 
   /** Select the first participant row; used when focus arrives from the keyboard. */
   selectDefault(): void {
-    const rows = this.#participantRows(this.snapshot());
+    const rows = this.#selectableRows();
     if (!rows.some((row) => row.id === this.#selectedId)) this.#selectedId = this.#expandedId ?? rows[0]?.id;
   }
 
@@ -200,7 +219,7 @@ export class FabricWidget implements Component, Focusable {
   }
 
   handleInput(data: string): void {
-    const rows = this.#participantRows(this.snapshot());
+    const rows = this.#selectableRows();
     const index = Math.max(0, rows.findIndex((row) => row.id === this.#selectedId));
     const select = (next: number): void => {
       const row = rows[Math.max(0, Math.min(rows.length - 1, next))];
@@ -218,12 +237,15 @@ export class FabricWidget implements Component, Focusable {
     } else if (matchesKey(data, "enter") || data === " ") {
       if (this.#selectedId) this.#toggle(this.#selectedId);
     } else if (this.#expandedId && (matchesKey(data, "pageUp") || data === "K")) {
-      this.#activityScroll = Math.min(this.#activityMaxScroll, this.#activityScroll + WIDGET_ACTIVITY_ROWS - 1);
+      this.#activityScroll = Math.min(this.#activityMaxScroll, this.#activityScroll + Math.max(1, this.#paneRows - 1));
     } else if (this.#expandedId && (matchesKey(data, "pageDown") || data === "J")) {
-      this.#activityScroll = Math.max(0, this.#activityScroll - (WIDGET_ACTIVITY_ROWS - 1));
+      this.#activityScroll = Math.max(0, this.#activityScroll - Math.max(1, this.#paneRows - 1));
     } else if (this.#expandedId && (matchesKey(data, "end") || data === "G")) {
       this.#activityScroll = 0;
     } else {
+      // Not a widget key: give focus and the key back to the editor, so typing,
+      // Ctrl+C, and extension shortcuts still work after a stray click.
+      this.interaction?.release(data);
       return;
     }
     this.interaction?.requestRender();
@@ -239,10 +261,10 @@ export class FabricWidget implements Component, Focusable {
     if (event.type === "press") return { handled: true };
     if (event.type !== "click" || event.button !== "left") return undefined;
     const row = this.#rows.find((candidate) => candidate.line === event.y);
-    if (row) {
-      this.#selectedId = row.id;
-      this.#toggle(row.id);
-    }
+    // Only a participant row takes focus; a click elsewhere leaves the editor focused.
+    if (!row) return undefined;
+    this.#selectedId = row.id;
+    this.#toggle(row.id);
     return { focus: true, render: true };
   }
 
@@ -256,9 +278,21 @@ export class FabricWidget implements Component, Focusable {
     this.#activityScroll = 0;
   }
 
-  /** Rows a user can select, in the same order the widget draws them. */
-  #participantRows(snapshot: FabricDashboardSnapshot): FabricWidgetRow[] {
-    return this.#content(snapshot).rows;
+  /** Rows a user can select: the participant rows the widget shows, in drawing order. */
+  #selectableRows(): FabricWidgetRow[] {
+    const { lines, rows } = this.#content(this.snapshot());
+    const { listLimit } = this.#layout(lines.length, this.#expandedId !== undefined, this.#rowLimit());
+    return rows.filter((row) => row.line < listLimit);
+  }
+
+  /** List and pane heights; the pane exists only while a row is expanded. */
+  #layout(listLength: number, expanded: boolean, limit: number): { listLimit: number; paneRows: number } {
+    if (!expanded) return { listLimit: limit, paneRows: 0 };
+    const budget = widgetExpandedRowLimit(this.maxRows, this.terminalRows?.());
+    // Two dividers frame the pane. Keep at least two list rows and one pane row.
+    const listLimit = Math.max(2, Math.min(listLength, limit, budget - 5));
+    const paneRows = Math.max(1, Math.min(WIDGET_ACTIVITY_ROWS, budget - Math.min(listLength, listLimit) - 2));
+    return { listLimit, paneRows };
   }
 
   #rowLimit(): number {
@@ -283,10 +317,11 @@ export class FabricWidget implements Component, Focusable {
       this.#renderedFocus !== this.focused ||
       this.#renderedSelection !== this.#selectedId ||
       this.#renderedExpansion !== this.#interactionKey();
-    // An open activity pane reads a live log, so it is rebuilt on every render.
-    if (interactionChanged || this.#expandedId) this.#pending = undefined;
+    if (interactionChanged) this.#pending = undefined;
+    // An open pane reads a live log: reuse only the lines hasChanged() just
+    // built, never the last frame, whose snapshot key says nothing about the log.
     const lines =
-      !interactionChanged && !this.#expandedId &&
+      !interactionChanged &&
       this.#pending?.width === width &&
       this.#pending.limit === limit &&
       this.#pending.snapshot === snapshot
@@ -311,7 +346,6 @@ export class FabricWidget implements Component, Focusable {
 
   hasChanged(): boolean {
     if (this.#lastWidth === undefined || this.#lastLines === undefined) return true;
-    if (this.#expandedId) return true;
     const snapshot = this.snapshot();
     const limit = this.#rowLimit();
     const lines = this.#renderLines(snapshot, this.#lastWidth, limit);
@@ -341,18 +375,21 @@ export class FabricWidget implements Component, Focusable {
       if (!row || !this.focused || row.id !== this.#selectedId) return line;
       return `${this.theme.fg("accent", "▸")}${line.replace(/^ /, "")}`;
     });
-    this.#rows = rows;
+    const { listLimit, paneRows } = this.#layout(lines.length, expanded !== undefined, limit);
+    // Rows cut off by the row limit are neither clickable nor selectable.
+    this.#rows = rows.filter((row) => row.line < listLimit);
     if (!expanded) return this.#boundContent(this.#withFocusHint(marked, rows.length > 0), width, limit);
-    // Expanded: the participant list stays bounded above an inline activity pane.
-    const paneRows = Math.max(3, Math.min(WIDGET_ACTIVITY_ROWS, limit * 2));
-    const listLimit = Math.max(2, Math.min(lines.length, limit));
+    // Expanded: the participant list stays bounded above an inline activity pane,
+    // and both together stay inside the widget's terminal share.
     const list = this.#boundContent(this.#withFocusHint(marked, true), width, listLimit);
+    this.#paneRows = paneRows;
     const activity = widgetActivityLines(
       this.theme,
       this.interaction?.activity(expanded),
       width,
       paneRows,
       this.#activityScroll,
+      this.interaction?.hideThinking?.() ?? false,
     );
     this.#activityMaxScroll = activity.maxScroll;
     this.#activityScroll = Math.min(this.#activityScroll, activity.maxScroll);
@@ -360,7 +397,6 @@ export class FabricWidget implements Component, Focusable {
     const help = this.focused
       ? "↑↓ switch · PgUp/PgDn scroll · ⏎/click collapse · esc close"
       : `click or ${FABRIC_WIDGET_FOCUS_SHORTCUT} to focus`;
-    this.#rows = rows.filter((row) => row.line < list.length);
     return [
       ...list,
       widgetDivider(this.theme, width, this.theme.fg("accent", `${safeText(expanded.name)} activity${position}`)),
