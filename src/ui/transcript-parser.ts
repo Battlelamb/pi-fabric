@@ -5,6 +5,7 @@ import {
   clip,
   compactRedactedValue,
   contentText,
+  contentThinking,
   messageError,
   recordOf,
   redact,
@@ -24,6 +25,7 @@ export class TranscriptAccumulator {
   readonly #anonymousTools = new Map<string, FabricTranscriptEntry[]>();
   readonly #activeTools: FabricTranscriptEntry[] = [];
   #assistant: FabricTranscriptEntry | undefined;
+  #thinking: FabricTranscriptEntry | undefined;
   #retry: FabricTranscriptEntry | undefined;
   #compaction: FabricTranscriptEntry | undefined;
   readonly #userMessages = new Map<string, FabricTranscriptEntry>();
@@ -58,7 +60,32 @@ export class TranscriptAccumulator {
     return `${prefix}-${this.#sequence++}`;
   }
 
+  /** Keep the latest assistant reasoning as one entry that grows while it streams. */
+  #trackThinking(id: string, content: unknown): void {
+    const text = terminalSafe(contentThinking(content), false);
+    if (!text) return;
+    if (!this.#thinking) {
+      this.#thinking = {
+        id: `${id}-thinking`,
+        kind: "thinking",
+        label: "Thinking",
+        text: clip(text, MAX_TRANSCRIPT_MESSAGE_CHARS, false),
+        status: "running",
+      };
+      this.entries.push(this.#thinking);
+      return;
+    }
+    this.#thinking.text = clip(text, MAX_TRANSCRIPT_MESSAGE_CHARS, false);
+  }
+
+  #finishThinking(status: "completed" | "failed"): void {
+    if (!this.#thinking) return;
+    this.#thinking.status = status;
+    this.#thinking = undefined;
+  }
+
   #finishAssistant(status: "completed" | "failed"): void {
+    this.#finishThinking(status);
     if (!this.#assistant) return;
     this.#assistant.status = status;
     this.#assistant = undefined;
@@ -370,6 +397,15 @@ export class TranscriptAccumulator {
       return;
     }
 
+    // Worker RPC logs stream reasoning as bare deltas without a message body.
+    if (event.type === "message_update" && event.message === undefined) {
+      const update = recordOf(event.assistantMessageEvent);
+      if (update?.type === "thinking_delta" && typeof update.delta === "string") {
+        const previous = this.#thinking?.text ?? "";
+        this.#trackThinking(id, [{ type: "thinking", thinking: `${previous}${update.delta}` }]);
+      }
+      return;
+    }
     if (event.type === "message_start") this.#finishAssistant("completed");
     if (event.type === "message_start" || event.type === "message_update") {
       const message = recordOf(event.message);
@@ -381,6 +417,7 @@ export class TranscriptAccumulator {
         return;
       }
       if (message.role !== "assistant") return;
+      this.#trackThinking(id, message.content);
       const text = terminalSafe(contentText(message.content));
       if (!text) return;
       if (!this.#assistant) {
@@ -407,6 +444,7 @@ export class TranscriptAccumulator {
         return;
       }
       if (message.role !== "assistant") return;
+      this.#trackThinking(id, message.content);
       const error = messageError(message);
       if (error) {
         this.#finishAssistant("failed");

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { resolveAgentDir } from "../core/agent-dir.js";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
+import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { CodePreviewSettings } from "./code-preview.js";
 import type { FabricConversationState, FabricConversationTarget, FabricConversationView } from "./conversation.js";
 import type { NativeConversationReader, NativeConversationSource } from "./conversation-native-reader.js";
@@ -21,6 +21,7 @@ import { createDashboardSnapshot, FabricDashboardSnapshotCache } from "./snapsho
 import { safeText } from "./format.js";
 import { isActiveStatus, type FabricDashboardSnapshot, type FabricUiActor, type FabricUiAgent } from "./types.js";
 import { FabricWidget, shouldShowFabricWidget } from "./widget.js";
+import { WIDGET_ACTIVITY_LOG_LINES } from "./widget-activity.js";
 import { FabricWidgetRetention } from "./retention.js";
 import { AgentTranscriptReader, type FabricTranscriptSource } from "./transcript.js";
 
@@ -73,6 +74,8 @@ export class FabricUiController {
   #dashboardTui: TUI | undefined;
   #widgetMounted = false;
   #widget: FabricWidget | undefined;
+  /** Component that had focus before the widget took it (normally the editor). */
+  #widgetReturnFocus: Component | undefined;
   #lastRefreshErrorAt = 0;
   #lastRefreshAt = 0;
   #dashboardOpen = false;
@@ -91,6 +94,8 @@ export class FabricUiController {
   #activityRuns: FabricActivityRun[] = [];
   #activityView: ((detailed?: boolean) => FabricActivityRun[]) | undefined;
   readonly #transcripts = new AgentTranscriptReader();
+  /** Deeper pages for the widget's activity pane, so a turn's early thinking and tool calls stay visible. */
+  readonly #widgetTranscripts = new AgentTranscriptReader(WIDGET_ACTIVITY_LOG_LINES);
   readonly #conversationReaders = new Map<string, NativeConversationReader>();
   #activeConversationReader: string | undefined;
   readonly #snapshotCache = new FabricDashboardSnapshotCache();
@@ -166,6 +171,7 @@ export class FabricUiController {
     this.#activityRuns = [];
     this.#activityView = undefined;
     this.#transcripts.clear();
+    this.#widgetTranscripts.clear();
     for (const reader of this.#conversationReaders.values()) reader.clear();
     this.#conversationReaders.clear();
     this.#activeConversationReader = undefined;
@@ -174,7 +180,32 @@ export class FabricUiController {
 
   /** True while Fabric owns keyboard input, including asynchronous view setup. */
   get ownsInput(): boolean {
-    return this.#dashboardOpen || this.#conversationOpen || this.#tasksOpen;
+    // A focused widget owns Esc/arrows, so Esc there closes the pane instead of halting workers.
+    return this.#dashboardOpen || this.#conversationOpen || this.#tasksOpen || this.#widget?.focused === true;
+  }
+
+  /** Focus the bottom widget so its participant rows can be expanded in place. */
+  focusWidget(context: ExtensionContext): void {
+    if (context.mode !== "tui") return;
+    const tui = this.#widgetTui as (TUI & { getFocusedComponent?(): unknown }) | undefined;
+    const widget = this.#widget;
+    if (!tui || !widget) {
+      context.ui.notify("No Fabric activity to expand", "info");
+      return;
+    }
+    if (widget.focused) return this.#releaseWidget();
+    const current = tui.getFocusedComponent?.();
+    if (current && current !== widget) this.#widgetReturnFocus = current as Component;
+    widget.selectDefault();
+    tui.setFocus(widget);
+    tui.requestRender();
+  }
+
+  #releaseWidget(): void {
+    const tui = this.#widgetTui;
+    if (!tui || !this.#widget?.focused) return;
+    tui.setFocus(this.#widgetReturnFocus ?? null);
+    tui.requestRender();
   }
 
   async openTasks(context: ExtensionContext, query?: string): Promise<void> {
@@ -807,12 +838,25 @@ export class FabricUiController {
         WIDGET_ID,
         (tui, theme) => {
           this.#widgetTui = tui;
+          // Mouse clicks focus the widget without a shortcut, so remember the editor up front.
+          const focused = (tui as TUI & { getFocusedComponent?(): unknown }).getFocusedComponent?.();
+          if (focused) this.#widgetReturnFocus = focused as Component;
           this.#widget = new FabricWidget(
             theme,
             () => this.#snapshot,
             config.maxRows,
             () => tui.terminal?.rows ?? process.stdout.rows,
             this.#widgetRetention,
+            {
+              activity: (row) => {
+                const target = row.kind === "actor"
+                  ? this.#snapshot.actors.find((actor) => actor.id === row.id)
+                  : this.#snapshot.agents.find((agent) => agent.id === row.id);
+                return target ? this.#widgetTranscripts.read(this.#transcriptSource(target)) : undefined;
+              },
+              release: () => this.#releaseWidget(),
+              requestRender: () => tui.requestRender(),
+            },
           );
           return this.#widget;
         },
@@ -821,6 +865,7 @@ export class FabricUiController {
       return;
     }
     if (!this.#widgetMounted) return;
+    this.#releaseWidget();
     context.ui.setWidget(WIDGET_ID, undefined);
     this.#widgetMounted = false;
     this.#widgetTui = undefined;

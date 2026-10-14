@@ -10,6 +10,7 @@ import { restoreBorrowedInPlaceMain } from "../prewalk/return.js";
 import { truncateMiddle } from "../util.js";
 import type { FabricUiController } from "../ui/controller.js";
 import { FABRIC_CONVERSATION_SHORTCUT } from "../ui/conversation-shortcut.js";
+import { FABRIC_WIDGET_FOCUS_SHORTCUT } from "../ui/widget-activity.js";
 import { safeText } from "../ui/format.js";
 import { FabricModelSelector } from "../ui/fabric-model-selector.js";
 import { buildModelSource } from "../ui/model-picker.js";
@@ -287,6 +288,14 @@ export function registerFabricCommand(pi: ExtensionAPI, deps: FabricCommandDeps)
     },
   });
 
+  pi.registerShortcut?.(FABRIC_WIDGET_FOCUS_SHORTCUT, {
+    description: "Focus the Fabric widget to expand an agent's live activity",
+    handler: async (context) => {
+      if (context.mode !== "tui") return;
+      fabricUi.focusWidget(context);
+    },
+  });
+
   pi.registerShortcut?.("ctrl+alt+t", {
     description: "Inspect Fabric background shell tasks",
     handler: async (context) => {
@@ -304,6 +313,7 @@ export function registerFabricCommand(pi: ExtensionAPI, deps: FabricCommandDeps)
         "dashboard",
         "tasks",
         "chat",
+        "focus",
         "settings",
         "schema",
         "prewalk",
@@ -576,6 +586,10 @@ export function registerFabricCommand(pi: ExtensionAPI, deps: FabricCommandDeps)
       }
       if (command === "chat") {
         await fabricUi.openConversation(context, argumentsList.join(" ") || undefined);
+        return;
+      }
+      if (command === "focus") {
+        fabricUi.focusWidget(context);
         return;
       }
       if (command === "decisions") {
