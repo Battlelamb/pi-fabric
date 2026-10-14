@@ -94,7 +94,7 @@ gate.
 Publishing runs `prepack`, which is `proof:check && typecheck && build` followed by
 `scripts/bundle-pi-packages.mjs`, never the suite. That script turns each
 `bundledDependencies` symlink (Bun's isolated linker) into a real copy so `bun pm
-pack` does not silently drop it, and prunes Pi host packages from it. `proof:check` requires the pinned Bend 2.0.36 compiler; normal builds verify
+pack` does not silently drop it, and prunes Pi host packages from it. `proof:check` requires the pinned Bend 2.0.37 compiler; normal builds verify
 the checked-in artifact hashes without requiring Bend. After a version bump the artifact is verified through
 `dist-tags` and `time["<version>"]` in the packument.
 
