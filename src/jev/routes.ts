@@ -23,8 +23,8 @@ export interface JevRoute {
   readonly aliases: readonly string[];
 }
 
-/** Direct TypeSafe aliases. All of them resolve to `jev-1.13.0` today. */
-export const JEV_TYPESAFE_MODELS: readonly string[] = ["jev-latest", "jev-1.13", "jev-1.13.0", "jev-preview"];
+/** Direct TypeSafe aliases. `jev-latest` is `jev-1.13.0` until TypeSafe moves it to 1.14; `jev-preview` is `jev-1.14.0`. */
+export const JEV_TYPESAFE_MODELS: readonly string[] = ["jev-latest", "jev-1.13", "jev-1.13.0", "jev-1.14.0", "jev-preview"];
 
 export const JEV_TYPESAFE_ROUTE: JevRoute = {
   id: "typesafe",
@@ -40,6 +40,7 @@ export const JEV_TYPESAFE_ROUTE: JevRoute = {
 export const JEV_OPENROUTER_MODELS: Readonly<Record<string, string>> = {
   "jev-latest": "~typesafe/jev-latest",
   "jev-1.13": "typesafe/jev-1.13",
+  "jev-1.14": "typesafe/jev-1.14",
 };
 
 /**

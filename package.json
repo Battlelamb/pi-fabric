@@ -186,6 +186,6 @@
     "source-map-js": "1.2.2"
   },
   "optionalDependencies": {
-    "jev-fabric": "0.7.1"
+    "jev-fabric": "0.8.0"
   }
 }

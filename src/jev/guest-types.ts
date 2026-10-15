@@ -47,7 +47,8 @@ interface FabricJevRun<T = unknown> {
 type DecisionJSON = FabricJevJson;
 type DecisionDescription = FabricJevDescription;
 type DecisionAPI = "system-one" | "cloudflare" | "openai-decisions" | "vercel-evaluate" | "llama-cpp" | "llama-system-one" | "anthropic" | "google";
-type DecisionQuestion = Exclude<FabricJevQuestion, { type: "noul" }> | { type: "boolean" | "bool" | "noul" | "predicate"; instructions: DecisionDescription; criteria?: { true?: DecisionDescription; false?: DecisionDescription } };
+type DecisionQuestion = Exclude<FabricJevQuestion, { type: "noul" }> | { type: "boolean" | "bool" | "noul" | "predicate"; instructions: DecisionDescription; criteria?: { true?: DecisionDescription; false?: DecisionDescription } }
+  | { type: "box"; instructions: DecisionDescription };
 interface DecisionTarget {
   provider: string; api?: DecisionAPI; model?: string; endpoint?: string;
   allowLocal?: boolean; allowGenerated?: boolean; providerOptions?: Record<string, DecisionJSON>; temperature?: number;
@@ -55,7 +56,7 @@ interface DecisionTarget {
 interface DecisionProfiles { version: 1; defaultProfile?: string; profiles: Record<string, DecisionTarget> }
 interface DecisionRequest extends Partial<DecisionTarget> {
   profile?: string; state: DecisionDescription; questions: Record<string, DecisionQuestion>;
-  images?: { type?: "image"; data: string; mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif" }[];
+  images?: { type?: "image"; data: string; mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; ref?: string }[];
 }
 type DecisionImageSupport = "supported" | "unsupported" | "model-dependent";
 interface DecisionResolution {
@@ -66,6 +67,7 @@ interface DecisionProvider { provider: string; api: DecisionAPI | ""; defaultMod
 type DecisionAnswer = { type: "boolean"; probability: number }
   | { type: "choice"; choice: string; probabilities?: Record<string, number>; confidence?: number }
   | { type: "score"; score: number; probabilities?: Record<string, number>; confidence?: number; legend?: Record<string, DecisionDescription> }
+  | { type: "box"; box: { top: number; bottom: number; left: number; right: number }; confidence?: number }
   | { type: "refusal"; [field: string]: unknown };
 interface DecisionResult {
   status: "ok" | "error"; provider: string; api: DecisionAPI; model: string; answers: Record<string, DecisionAnswer>;

@@ -66,15 +66,16 @@ describe("Jev route selection", () => {
     expect(resolveJevClassifierTarget("pi-fabric/vercel-ai-gateway/jev-preview")).toMatchObject({ ok: false, message: expect.stringContaining("Vercel AI Gateway serves") });
     const keys = jevClassifierModels("typesafe-ai/jev").map(model => `${model.provider}/${model.id}`);
     expect(keys).toEqual([
-      "pi-fabric/typesafe/jev-latest", "pi-fabric/typesafe/jev-1.13", "pi-fabric/typesafe/jev-1.13.0", "pi-fabric/typesafe/jev-preview",
-      "pi-fabric/openrouter/jev-latest", "pi-fabric/openrouter/jev-1.13",
+      "pi-fabric/typesafe/jev-latest", "pi-fabric/typesafe/jev-1.13", "pi-fabric/typesafe/jev-1.13.0", "pi-fabric/typesafe/jev-1.14.0", "pi-fabric/typesafe/jev-preview",
+      "pi-fabric/openrouter/jev-latest", "pi-fabric/openrouter/jev-1.13", "pi-fabric/openrouter/jev-1.14",
       "pi-fabric/vercel-ai-gateway/jev-latest", "pi-fabric/vercel-ai-gateway/typesafe-ai/jev",
       "pi-fabric/subq/subq-snap-preview",
     ]);
     expect(jevClassifierModels("typesafe/jev-1.13").map(model => `${model.provider}/${model.id}`)).toContain("pi-fabric/openrouter/typesafe/jev-1.13");
     expect(new Set(keys).size).toBe(keys.length);
-    expect(JEV_TYPESAFE_MODELS).toEqual(["jev-latest", "jev-1.13", "jev-1.13.0", "jev-preview"]);
-    expect(Object.keys(JEV_OPENROUTER_MODELS)).toEqual(["jev-latest", "jev-1.13"]);
+    expect(JEV_TYPESAFE_MODELS).toEqual(["jev-latest", "jev-1.13", "jev-1.13.0", "jev-1.14.0", "jev-preview"]);
+    expect(Object.keys(JEV_OPENROUTER_MODELS)).toEqual(["jev-latest", "jev-1.13", "jev-1.14"]);
+    expect(resolveJevUpstreamModel(JEV_OPENROUTER_ROUTE, "jev-1.14")).toBe("typesafe/jev-1.14");
     expect(Object.keys(JEV_VERCEL_MODELS)).toEqual(["jev-latest"]);
     expect(JEV_TYPESAFE_ROUTE.envKeys).toEqual(["TYPESAFE_API_KEY"]);
     expect(JEV_OPENROUTER_ROUTE.envKeys).toEqual(["OPENROUTER_API_KEY", "TYPESAFE_OPENROUTER_API_KEY"]);

@@ -4,7 +4,9 @@ export type DecisionDescription = string | DecisionJSON[] | { [key: string]: Dec
 export type DecisionQuestion =
   | { type: "choice"; instructions: DecisionDescription; criteria: Record<string, DecisionDescription | null> }
   | { type: "score"; instructions: DecisionDescription; criteria: DecisionDescription[] }
-  | { type: "boolean" | "bool" | "noul" | "predicate"; instructions: DecisionDescription; criteria?: { true?: DecisionDescription; false?: DecisionDescription } };
+  | { type: "boolean" | "bool" | "noul" | "predicate"; instructions: DecisionDescription; criteria?: { true?: DecisionDescription; false?: DecisionDescription } }
+  /** TypeSafe only (Jev 1.14): one bounding box around what the instructions name, in an image of the request. */
+  | { type: "box"; instructions: DecisionDescription };
 export type DecisionAPI = "system-one" | "cloudflare" | "openai-decisions" | "vercel-evaluate" | "llama-cpp" | "llama-system-one" | "anthropic" | "google";
 export interface DecisionTarget {
   provider: string;
@@ -25,7 +27,8 @@ export interface DecisionRequest extends Partial<DecisionTarget> {
   profile?: string;
   state: DecisionDescription;
   questions: Record<string, DecisionQuestion>;
-  images?: { type?: "image"; data: string; mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif" }[];
+  /** `ref` places the image for TypeSafe (which requires it): wherever that text appears in the state, instructions or criteria. */
+  images?: { type?: "image"; data: string; mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; ref?: string }[];
 }
 export type DecisionImageSupport = "supported" | "unsupported" | "model-dependent";
 export interface DecisionProvider {
@@ -48,6 +51,7 @@ export type DecisionAnswer =
   | { type: "boolean"; probability: number }
   | { type: "choice"; choice: string; probabilities?: Record<string, number>; confidence?: number }
   | { type: "score"; score: number; probabilities?: Record<string, number>; confidence?: number; legend?: Record<string, DecisionDescription> }
+  | { type: "box"; box: { top: number; bottom: number; left: number; right: number }; confidence?: number }
   | { type: "refusal"; [field: string]: unknown };
 export interface DecisionResult {
   status: "ok" | "error";
