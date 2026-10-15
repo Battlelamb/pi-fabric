@@ -966,7 +966,7 @@ return async function piFabric(pi: ExtensionAPI, options: { managedHost?: Fabric
     if (epoch !== extractiveEpoch || !extractiveConfig()?.enabled || context.signal?.aborted ||
       context.sessionManager.getSessionId() !== sessionId || context.sessionManager.getLeafId() !== leaf) return;
     extractiveHistory ??= new ExtractiveHistory(extractiveConfig);
-    await extractiveHistory.prepare(context, event.prompt);
+    await extractiveHistory.prepare(context, event.messageType !== "custom" ? event.prompt : "");
   });
 
   pi.on("context", async (event, context) => {
@@ -1043,7 +1043,7 @@ return async function piFabric(pi: ExtensionAPI, options: { managedHost?: Fabric
     // Turn-derived: delivered via the message channel (below), never the
     // system prompt, so the cached system prefix stays byte-stable.
     const skillReferenceGuidance = effectiveFullCodeMode
-      ? buildSkillReferenceGuidance(event.prompt, skills)
+      ? buildSkillReferenceGuidance(event.messageType !== "custom" ? event.prompt : "", skills)
       : undefined;
     const currentModel = context.model
       ? `${context.model.provider}/${context.model.id}`
@@ -1109,7 +1109,7 @@ return async function piFabric(pi: ExtensionAPI, options: { managedHost?: Fabric
     const names = rewritableHiddenCapturedToolNames(hiddenCapturedToolNames());
     if (names.length === 0) return;
     const mentioned = proxyContractMentionsInSkills(
-      event.prompt,
+      event.messageType !== "custom" ? event.prompt : "",
       event.systemPrompt,
       names,
     );
