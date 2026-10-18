@@ -146,7 +146,7 @@ export class RuntimeStateBuiltins {
         provider: "decisions",
         description: "Durable pending decisions over the project mesh",
         requires: ["mesh.get"],
-        create: () => new DecisionsProvider(new DecisionStore(mesh, identity), identity),
+        create: () => new DecisionsProvider(new DecisionStore(mesh, identity), identity, config.executor.maxTimeoutMs),
       }));
     } else {
       const meshDisabled =
