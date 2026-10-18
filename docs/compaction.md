@@ -160,6 +160,12 @@ still apply without a model window. This fallback emits no fabricated model
 window or calibrated budget metadata. Its bound is on structural raw-tail
 estimates plus the bounded summary, not unknown fixed provider overhead.
 
+When Fabric cancels a manual or overflow compaction because it cannot produce
+a summary (nothing to cut, no raw source, or no summary that fits the target),
+a UI context receives a bounded warning naming the reason. A cancelled
+threshold compaction stays quiet: Pi rechecks the threshold before every
+assistant response, so a warning there would repeat on each call.
+
 The live cut determines only what Pi keeps. The summary source is the raw
 active-branch prefix before that new boundary. Normalization skips earlier
 compaction and branch-summary prose within that prefix. For dialogue selection
