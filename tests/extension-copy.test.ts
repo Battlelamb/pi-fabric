@@ -12,7 +12,10 @@ let root: string;
 const makeCopy = (directory: string, options: { name?: string; entry?: string } = {}): string => {
   const entry = options.entry ?? "dist/extension-bootstrap.js";
   fs.mkdirSync(path.join(root, directory, path.dirname(entry)), { recursive: true });
-  fs.writeFileSync(path.join(root, directory, "package.json"), JSON.stringify({ name: options.name ?? "pi-fabric" }));
+  fs.writeFileSync(
+    path.join(root, directory, "package.json"),
+    JSON.stringify({ name: options.name ?? "pi-fabric", pi: { extensions: ["./dist/extension-bootstrap.js"] } }),
+  );
   fs.writeFileSync(path.join(root, directory, entry), "export default () => {};\n");
   return path.join(root, directory, entry);
 };
@@ -60,8 +63,21 @@ describe("commandLineFabricCopy", () => {
     expect(commandLineFabricCopy(profileBuild, cli("current/dist/extension-bootstrap.js"))).toBe(parentBuild);
     expect(commandLineFabricCopy(profileBuild, cli("~/build-1/dist/extension-bootstrap.js"))).toBe(parentBuild);
     expect(commandLineFabricCopy(profileBuild, { argv: ["pi", "--extension", parentBuild], cwd: "/" })).toBe(parentBuild);
-    expect(commandLineFabricCopy(profileBuild, cli("build-1"))).toBe(path.join(root, "build-1"));
+    expect(commandLineFabricCopy(profileBuild, cli("build-1"))).toBe(parentBuild);
     expect(commandLineFabricCopy(parentBuild, cli("build-1"))).toBeUndefined();
+  });
+
+  it("resolves a package directory to the entry its manifest lists, like Pi", () => {
+    const source = makeCopy("checkout", { entry: "src/index.ts" });
+    const profileBuild = makeCopy("build");
+
+    // Unbuilt: Pi loads no Fabric from the directory, so the settings copy stays active.
+    expect(commandLineFabricCopy(profileBuild, cli("checkout"))).toBeUndefined();
+    const built = makeCopy("checkout");
+    expect(commandLineFabricCopy(profileBuild, cli("checkout"))).toBe(built);
+    // The directory loads dist/, a different module than src/ in the same package.
+    expect(commandLineFabricCopy(source, cli("checkout"))).toBe(built);
+    expect(commandLineFabricCopy(built, cli("checkout"))).toBeUndefined();
   });
 
   it("defers to a different entry module of the same build", () => {

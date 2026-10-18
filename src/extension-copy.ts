@@ -9,8 +9,8 @@ const ENTRY_STEMS = new Set(["index", "extension-bootstrap"]);
 interface FabricCopy {
   root: string;
   name: string;
-  /** Real path of the entry file; absent when the command line names the package directory. */
-  file?: string;
+  /** Real path of the entry module. */
+  file: string;
 }
 
 export interface FabricCommandLine {
@@ -26,14 +26,46 @@ const extensionArguments = (argv: readonly string[]): string[] => {
   return values;
 };
 
-const packageName = (directory: string): string | undefined => {
+interface PackageManifest {
+  name?: unknown;
+  pi?: { extensions?: unknown };
+}
+
+const readManifest = (directory: string): PackageManifest | undefined => {
   try {
     const manifest: unknown = JSON.parse(fs.readFileSync(path.join(directory, "package.json"), "utf8"));
-    const name = (manifest as { name?: unknown } | null)?.name;
-    return typeof name === "string" && name ? name : undefined;
+    return manifest && typeof manifest === "object" ? manifest as PackageManifest : undefined;
   } catch {
     return undefined;
   }
+};
+
+const packageName = (directory: string): string | undefined => {
+  const name = readManifest(directory)?.name;
+  return typeof name === "string" && name ? name : undefined;
+};
+
+const isEntryModule = (root: string, file: string): boolean => {
+  const relative = path.relative(root, file);
+  const stem = path.basename(relative, path.extname(relative));
+  return ENTRY_DIRECTORIES.has(path.dirname(relative)) && ENTRY_STEMS.has(stem);
+};
+
+// Like Pi, a package directory loads the existing files its manifest lists in `pi.extensions`.
+const directoryEntry = (root: string): string | undefined => {
+  const extensions = readManifest(root)?.pi?.extensions;
+  if (!Array.isArray(extensions)) return undefined;
+  for (const extension of extensions) {
+    if (typeof extension !== "string") continue;
+    const listed = path.resolve(root, extension);
+    if (!isEntryModule(root, listed)) continue;
+    try {
+      return fs.realpathSync(listed);
+    } catch {
+      // Pi skips a listed entry that does not exist, such as an unbuilt dist/.
+    }
+  }
+  return undefined;
 };
 
 // The nearest enclosing package with a name; a nameless package.json only sets module options.
@@ -57,15 +89,12 @@ const describeCopy = (location: string, entryOnly: boolean): FabricCopy | undefi
   }
   if (directory) {
     const name = packageName(real);
-    return name ? { root: real, name } : undefined;
+    const file = name ? directoryEntry(real) : undefined;
+    return name && file ? { root: real, name, file } : undefined;
   }
   const owner = enclosingPackage(real);
   if (!owner) return undefined;
-  if (entryOnly) {
-    const relative = path.relative(owner.root, real);
-    const stem = path.basename(relative, path.extname(relative));
-    if (!ENTRY_DIRECTORIES.has(path.dirname(relative)) || !ENTRY_STEMS.has(stem)) return undefined;
-  }
+  if (entryOnly && !isEntryModule(owner.root, real)) return undefined;
   return { ...owner, file: real };
 };
 
@@ -96,12 +125,11 @@ export const commandLineFabricCopy = (
   const values = extensionArguments(commandLine.argv);
   if (values.length === 0) return undefined;
   const own = describeCopy(entryPath, false);
-  if (!own?.file) return undefined;
+  if (!own) return undefined;
   for (const value of values) {
     const copy = describeCopy(resolveArgument(value, commandLine.cwd), true);
     if (!copy || copy.name !== own.name) continue;
-    const selectsThisCopy = copy.file ? copy.file === own.file : copy.root === own.root;
-    return selectsThisCopy ? undefined : copy.file ?? copy.root;
+    return copy.file === own.file ? undefined : copy.file;
   }
   return undefined;
 };
