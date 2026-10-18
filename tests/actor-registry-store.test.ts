@@ -193,6 +193,19 @@ describe("ActorRegistryStore read failures", () => {
     expect(fs.readFileSync(registryPath, "utf8")).toBe(raw);
   });
 
+  it("keeps draining the mailbox while presence saves are refused", async () => {
+    const { actors, actor, registryPath } = await ownerHost();
+    const raw = JSON.stringify({ format: 1, actors: [remote] }).slice(0, -3);
+    fs.writeFileSync(registryPath, raw);
+
+    await expect(actors.ask(actor.id, "first")).resolves.toMatchObject({ text: "fake worker complete" });
+    await expect(actors.ask(actor.id, "second")).resolves.toMatchObject({ text: "fake worker complete" });
+    await vi.waitFor(() => expect(actors.status(actor.id).status).toBe("idle"));
+    expect(fs.readFileSync(registryPath, "utf8")).toBe(raw);
+    await expect(actors.close()).rejects.toThrow(ActorStoreReadError);
+    expect(fs.readFileSync(registryPath, "utf8")).toBe(raw);
+  });
+
   it(
     "refuses to save over a registry it has no permission to read",
     async ({ skip }) => {

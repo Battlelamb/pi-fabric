@@ -1280,6 +1280,9 @@ export class ActorManager {
     drain.then(release, release);
   }
 
+  // Presence saves inside the drain are best-effort, like the enqueue-time
+  // publish: a refused registry save (an unreadable actors.json, a lock
+  // timeout) must not strand a dequeued item or abandon the rest of the queue.
   async #drain(actor: ManagedActor): Promise<void> {
     try {
       while (
@@ -1295,14 +1298,14 @@ export class ActorManager {
         delete actor.lastError;
         const abortController = new AbortController();
         actor.abortController = abortController;
-        await this.#publishPresence(actor);
+        await this.#publishPresence(actor).catch(() => undefined);
         const beforeRun = await this.#validity(actor, item);
         if (!beforeRun.valid) {
           this.#recordStale(actor, item, beforeRun.reason);
           delete actor.abortController;
           actor.status = actor.queue.length > 0 ? "queued" : "idle";
           actor.updatedAt = Date.now();
-          await this.#publishPresence(actor);
+          await this.#publishPresence(actor).catch(() => undefined);
           continue;
         }
         let runId: string | undefined;
@@ -1322,7 +1325,7 @@ export class ActorManager {
               actor.queue.unshift(item);
               actor.status = "queued";
               actor.updatedAt = Date.now();
-              await this.#publishPresence(actor);
+              await this.#publishPresence(actor).catch(() => undefined);
               break;
             }
             delete actor.missingCapabilities;
@@ -1342,7 +1345,7 @@ export class ActorManager {
           actor.lastRunId = result.id;
           if (actor.runner === "claude" && result.runnerSessionId) {
             actor.runnerSessionId = result.runnerSessionId;
-            await this.#saveActors();
+            await this.#saveActors().catch(() => undefined);
           }
           runCompleted = result.status === "completed";
           if (result.status !== "completed") {
@@ -1455,7 +1458,7 @@ export class ActorManager {
           delete actor.abortController;
           actor.updatedAt = Date.now();
           if (actor.status !== "stopped") actor.status = actor.queue.length > 0 ? "queued" : "idle";
-          if (this.#canManage(actor.id)) await this.#publishPresence(actor);
+          if (this.#canManage(actor.id)) await this.#publishPresence(actor).catch(() => undefined);
         }
       }
     } finally {
