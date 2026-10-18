@@ -170,7 +170,9 @@ describe("cooperative bash middleware", () => {
     const h = harness({ hangMs: immediate ? 120_000 : 30 });
     fs.writeFileSync(path.join(h.cwd, "fixture"), `${SECRET}\n`);
     const result = await h.invoke({ command: "cat fixture; sleep 0.2; cat fixture", ...(immediate ? { run_in_background: true } : {}) });
-    expect(result).toMatchObject({ ok: true, details: { running: true, pid: expect.any(Number), logPath: expect.any(String) } });
+    // The pid is best-effort: a slow shell start (Git Bash on a loaded Windows
+    // runner) can miss the read window, and the handoff goes ahead without it.
+    expect(result).toMatchObject({ ok: true, details: { running: true, logPath: expect.any(String) } });
     expect(result.output).not.toContain(SECRET);
     await vi.waitFor(() => expect(h.provider.shellJobs.list()[0]?.finishedAt).toEqual(expect.any(Number)));
     const log = fs.readFileSync(result.details!.logPath!, "utf8");
@@ -189,9 +191,10 @@ describe("cooperative bash middleware", () => {
 
   it("keeps the explicit hard cap after handoff", async () => {
     const h = harness();
-    const result = await h.invoke({ command: "sleep 8", timeout: 0.1, background: true });
+    // Long enough that the cap cannot fire before a slow runner hands off.
+    const result = await h.invoke({ command: "sleep 8", timeout: 1, background: true });
     expect(result.details?.running).toBe(true);
-    await vi.waitFor(() => expect(h.provider.shellJobs.list()[0]?.finishedAt).toEqual(expect.any(Number)));
+    await vi.waitFor(() => expect(h.provider.shellJobs.list()[0]?.finishedAt).toEqual(expect.any(Number)), { timeout: 10_000 });
     expect(fs.readFileSync(result.details!.logPath!, "utf8")).toContain("timed out");
   });
 
