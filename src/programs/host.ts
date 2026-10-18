@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { FabricState } from "../fabric-state.js";
-import type { FabricProgramRunFieldV1, FabricProgramRunReplyV1, FabricProgramRunSnapshotV1 } from "../protocol.js";
+import type { FabricProgramRunReplyV1, FabricProgramRunSnapshotV1 } from "../protocol.js";
 import { hostProgramRunSource } from "./source.js";
 import {
   MAX_PROGRAM_REF_CHARS,
@@ -129,32 +129,19 @@ export const handleFabricProgramRunEvent = async (
 ): Promise<void> => {
   const { ref, input, requirePromoted, signal, unreadable, respond } = request;
   const refuse = (reason: string): void => respond({ ok: false, error: `Invalid program run request: ${reason}` });
-  // A named field whose getter threw is refused by name, at the point its check
-  // would have run. Before this change such a getter escaped the handler with no reply.
-  const refuseUnreadable = (...fields: FabricProgramRunFieldV1[]): boolean => {
-    const field = fields.find((name) => unreadable.has(name));
-    if (field === undefined) return false;
-    refuse(`${field} could not be read`);
-    return true;
-  };
   try {
-    // The checks, texts and order are the ones this event has always had.
-    if (refuseUnreadable("ref")) return;
+    if (unreadable) return refuse(`${unreadable} could not be read`);
     if (typeof ref !== "string" || !ref || ref.length > MAX_PROGRAM_REF_CHARS) {
       return refuse("ref must be a non-empty string");
     }
-    if (refuseUnreadable("requirePromoted")) return;
     if (requirePromoted !== undefined && typeof requirePromoted !== "boolean") {
       return refuse("requirePromoted must be a boolean");
     }
-    if (refuseUnreadable("signal")) return;
     if (signal !== undefined && !isAbortSignal(signal)) return refuse("signal must be an AbortSignal");
     if (!deps.context) {
       respond({ ok: false, error: "No active Pi session to run the program in" });
       return;
     }
-    // Last, as `input` was read last before this change: nothing runs on a request that could not be read in full.
-    if (refuseUnreadable("input")) return;
     respond(await runHostProgram(deps, deps.context, {
       ref,
       ...(input !== undefined ? { input } : {}),

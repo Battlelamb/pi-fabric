@@ -90,20 +90,14 @@ export interface FabricProgramRunSnapshotV1 {
   readonly requirePromoted: unknown;
   readonly signal: unknown;
   /**
-   * Fields whose getter threw when read. Each is `undefined` above; the handler
-   * refuses the request by name instead of letting the throw escape.
+   * The first field whose getter threw when read; the handler refuses the
+   * request by name instead of letting the throw escape.
    */
-  readonly unreadable: ReadonlySet<FabricProgramRunFieldV1>;
+  readonly unreadable: FabricProgramRunFieldV1 | undefined;
   /** Calls the caller's `reply` at most once, directly, and never throws. */
   readonly respond: (result: FabricProgramRunReplyV1) => void;
 }
 
-/**
- * Reads `reply` and each named field once, and never lets a getter's throw out.
- * Returns undefined when `reply` cannot be read, because nobody can be told.
- * Throws when `reply` reads as something other than a function, as the event
- * has always done for a payload without a `reply` function.
- */
 // Stands in for input that is not JSON. It is not JSON either, so the run
 // refuses it with the error it always gave.
 const NOT_JSON_INPUT = Symbol("not JSON");
@@ -123,6 +117,12 @@ const copyProgramRunInput = (input: unknown): unknown => {
   return NOT_JSON_INPUT;
 };
 
+/**
+ * Reads `reply` and each named field once, and never lets a getter's throw out.
+ * Returns undefined when `reply` cannot be read, because nobody can be told.
+ * Throws when `reply` reads as something other than a function, as the event
+ * has always done for a payload without a `reply` function.
+ */
 export const snapshotFabricProgramRunRequestV1 = (value: unknown): FabricProgramRunSnapshotV1 | undefined => {
   const request = value as Record<string, unknown> | null | undefined;
   let reply: unknown;
@@ -132,12 +132,12 @@ export const snapshotFabricProgramRunRequestV1 = (value: unknown): FabricProgram
     return undefined;
   }
   if (typeof reply !== "function") throw new Error("Invalid Pi Fabric program run request");
-  const unreadable = new Set<FabricProgramRunFieldV1>();
+  let unreadable: FabricProgramRunFieldV1 | undefined;
   const read = (field: FabricProgramRunFieldV1): unknown => {
     try {
       return request![field];
     } catch {
-      unreadable.add(field);
+      unreadable ??= field;
       return undefined;
     }
   };

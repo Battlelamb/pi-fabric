@@ -512,24 +512,15 @@ describe("host program runs", () => {
         return request;
       };
       const refused = (field: string) => `Invalid program run request: ${field} could not be read`;
-      const refError = "Invalid program run request: ref must be a non-empty string";
-      const sessionless = "No active Pi session to run the program in";
       const named = ["ref", "input", "requirePromoted", "signal"] as const;
 
-      const everyRefField: Array<[string, string]> = [
-        ["ref", refused("ref")],
-        ["requirePromoted", refused("requirePromoted")],
-        ["signal", refused("signal")],
-        // Checked after the session, as input was read before this change: no session is reported first.
-        ["input", sessionless],
-      ];
-      it.each(everyRefField)("%s on a ref request: nothing escapes the listener and the request is answered exactly once", async (field, error) => {
+      it.each(named)("%s on a ref request: nothing escapes the listener and the request is answered exactly once", async (field) => {
         const { listener, shutdown } = await boot();
         try {
           const answered = nextReply();
           const request = unreadable({ ref: "hello", reply: answered.reply }, field);
           expect(() => listener(request)).not.toThrow();
-          expect(await answered.done).toEqual({ ok: false, error });
+          expect(await answered.done).toEqual({ ok: false, error: refused(field) });
           await drained();
           expect(answered.calls()).toBe(1);
         } finally {
@@ -553,34 +544,13 @@ describe("host program runs", () => {
         expect(sendMessage).not.toHaveBeenCalled();
       });
 
-      it("gives the reviewer's probe, a numeric ref with a throwing input, exactly the one reply given before this change", async () => {
-        const { listener, shutdown } = await boot();
-        try {
-          const answered = nextReply();
-          const request = { ref: 7, get input(): never { throw new Error("x"); }, reply: answered.reply };
-          expect(() => listener(request)).not.toThrow();
-          expect(await answered.done).toEqual({ ok: false, error: "Invalid program run request: ref must be a non-empty string" });
-          await drained();
-          expect(answered.calls()).toBe(1);
-        } finally {
-          await shutdown();
-        }
-      });
-
-      describe("keeps the error given before this change where there was one", () => {
-        // Strings and order copied from the handler before this change. It read ref, then
-        // requirePromoted, then signal, then checked the session, and read input last.
+      describe("is refused before any other check", () => {
+        // The first unreadable field, in read order, is the one named.
         const cases: Array<[string, Record<string, unknown>, string[], string]> = [
-          ...(["input", "requirePromoted", "signal"] as const).map(
-            (field): [string, Record<string, unknown>, string[], string] => [`numeric ref, then ${field}`, { ref: 7 }, [field], refError]),
-          ["empty ref, then input", { ref: "" }, ["input"], refError],
-          ["oversized ref, then signal", { ref: "r".repeat(130) }, ["signal"], refError],
-          ["invalid requirePromoted before an unreadable signal", { ref: "hello", requirePromoted: "yes" }, ["signal"], "Invalid program run request: requirePromoted must be a boolean"],
-          ["valid ref and no session, but an unreadable requirePromoted: reached first, as it was read before this change", { ref: "hello" }, ["requirePromoted"], refused("requirePromoted")],
-          ["unreadable requirePromoted before an invalid signal", { ref: "hello", signal: {} }, ["requirePromoted"], refused("requirePromoted")],
-          ["invalid signal before an unreadable input", { ref: "hello", signal: {} }, ["input"], "Invalid program run request: signal must be an AbortSignal"],
-          ["unreadable signal before an unreadable input", { ref: "hello" }, ["signal", "input"], refused("signal")],
-          ["valid ref and no session, then input", { ref: "hello" }, ["input"], sessionless],
+          ["numeric ref, then input", { ref: 7 }, ["input"], refused("input")],
+          ["invalid requirePromoted, then signal", { ref: "hello", requirePromoted: "yes" }, ["signal"], refused("signal")],
+          ["invalid signal, then requirePromoted", { ref: "hello", signal: {} }, ["requirePromoted"], refused("requirePromoted")],
+          ["signal before input", { ref: "hello" }, ["signal", "input"], refused("signal")],
         ];
         it.each(cases)("%s", async (_name, fields, broken, error) => {
           const { listener, shutdown } = await boot();
