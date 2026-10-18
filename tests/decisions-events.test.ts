@@ -205,6 +205,17 @@ describe("decisions event channel", () => {
     expect((await store.get(id))?.status).toBe("cancelled");
   });
 
+  it("raises nothing when the caller aborts while the store resolves", async () => {
+    const store = decisionStore();
+    const controller = new AbortController();
+    const result = await ask({ title: "Name?" }, async () => {
+      controller.abort();
+      return { store };
+    }, { signal: controller.signal }).result;
+    expect(result).toEqual({ ok: false, error: "Decision request aborted" });
+    expect(await store.list()).toEqual([]);
+  });
+
   it("aborts a waiting request and cancels its decision when the session shuts down", async () => {
     const store = decisionStore();
     const listeners = new Map<string, (value: unknown) => void>();

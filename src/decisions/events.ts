@@ -141,6 +141,8 @@ export const answerFabricDecisionRequest = async (
       respond({ ok: false, error: target.reason });
       return;
     }
+    // Resolving the store can await runtime startup; do not raise after an abort.
+    signal?.throwIfAborted();
     const record = await raiseAndWait(
       target.store,
       decisionInputFromQuestion(request.question),
