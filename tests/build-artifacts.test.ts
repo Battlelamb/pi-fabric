@@ -111,13 +111,18 @@ describe("published build artifact guards", () => {
   });
   it("rejects a missing generated ABI declaration", () => {
     const dir = fixture();
-    fs.rmSync(path.join(dir, "dist/verified/generated/storage-kernel.d.ts"));
-    rejected(dir, "storage-kernel.d.ts");
+    fs.rmSync(path.join(dir, "dist/verified/generated/storage.d.ts"));
+    rejected(dir, "storage.d.ts");
   });
   it("rejects a modified generated library in the bundle", () => {
     const dir = fixture();
-    fs.appendFileSync(path.join(dir, "dist/verified/generated/storage-kernel.js"), "\n// changed\n");
+    fs.appendFileSync(path.join(dir, "dist/verified/generated/storage.js"), "\n// changed\n");
     rejected(dir, "Bundled verified artifact differs");
+  });
+  it("rejects a bundle that loads the prover", () => {
+    const dir = fixture();
+    fs.appendFileSync(path.join(dir, "dist/extension-bootstrap.js"), '\nimport("gdp-wired/machine");\n');
+    rejected(dir, "Published bundle loads the gdp-wired prover");
   });
   it("rejects a stale bundled receipt", () => {
     const dir = fixture();

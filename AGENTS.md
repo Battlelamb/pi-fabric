@@ -94,23 +94,34 @@ gate.
 Publishing runs `prepack`, which is `proof:check && typecheck && build` followed by
 `scripts/bundle-pi-packages.mjs`, never the suite. That script turns each
 `bundledDependencies` symlink (Bun's isolated linker) into a real copy so `bun pm
-pack` does not silently drop it, and prunes Pi host packages from it. `proof:check` requires the pinned Bend 2.0.37 compiler; normal builds verify
-the checked-in artifact hashes without requiring Bend. After a version bump the artifact is verified through
+pack` does not silently drop it, and prunes Pi host packages from it. `proof:check` runs the pinned
+`gdp-wired` devDependency; normal builds verify the checked-in artifact hashes without loading the
+prover. After a version bump the artifact is verified through
 `dist-tags` and `time["<version>"]` in the packument.
 
 ## Verified policy kernels
 
-`LAWS.bend`, `proofs/resource-spec.bend`, `proofs/state-spec.bend`,
-`proofs/provider-spec.bend`, `proofs/authority-spec.bend`, and
-`proofs/lifecycle-spec.bend` and `proofs/storage-spec.bend` require independent specification review; never weaken
-a law to make an implementation pass. `PROOF.bend` proves the actual executable source in
-the registered kernel entry points. After changing these sources, the ABI, or the generation
-bridge, run `bun run proof:generate`, `bun run proof:check`, and the targeted
+The kernels are gdp-wired rules and functions in `proofs/*.ts`: one module each
+for policy, compaction, resources, lifecycle, storage, provider and authority,
+registered in `proofs/index.ts`. Each law restates its requirement apart from
+the rule body, and specification changes require independent review; never
+weaken a law, or delete a broken variant, to make an implementation pass. When
+a law is refused, read the verdict first: add a missing helper law beside it, or
+fix the rule.
+
+`bun run proof:generate` proves every law (`proven && checked`), requires every
+broken variant to be refused, cross-checks the builders against the
+interpreter, and compiles the shipped machines into `src/verified/generated/`
+with a SHA-256 receipt. Do not hand-edit `src/verified/generated/`. After
+changing a proof module, a bridge in `src/verified/`, or the gdp-wired pin, run
+`bun run proof:generate`, `bun run proof:check`, and the targeted
 `tests/verified-kernels.test.ts`, `tests/verified-resources.test.ts`,
 `tests/verified-providers.test.ts`, `tests/verified-authority.test.ts`,
-`tests/verified-lifecycle.test.ts`, `tests/verified-storage.test.ts`, and `tests/verified-artifact.test.ts` plus relevant integration tests. Do not hand-edit
-`src/verified/generated/`. See `docs/verified-kernels.md` for the acceptance ledger
-and explicit host/adapter assumptions. Always finish with `bun run build`.
+`tests/verified-lifecycle.test.ts`, `tests/verified-storage.test.ts`, and
+`tests/verified-artifact.test.ts` plus relevant integration tests. The prover
+is a devDependency: never import `gdp-wired` from `src/`. See
+`docs/verified-kernels.md` for the acceptance ledger and explicit host/adapter
+assumptions. Always finish with `bun run build`.
 
 ## Package manager
 

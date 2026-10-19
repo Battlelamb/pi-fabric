@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { resourceConflict, resourceNormalize, resourceSource } from "../src/verified/generated/kernel.js";
-import { boundedEffectResources, decodeResourceScope, encodeResourceNames } from "../src/verified/resources.js";
+import {
+  boundedEffectResources, decodeResourceScope, resourceConflictOf as resourceConflict, resourceNormalize, resourceSource,
+} from "../src/verified/resources.js";
 import { effectConflictsBetween, summarizeEffects } from "../src/components/effect-policy.js";
 
-const source = (names: readonly unknown[] | undefined) => resourceSource(encodeResourceNames(names));
-const normalize = (names: readonly unknown[] | undefined, proposal: readonly unknown[]) => resourceNormalize(source(names), encodeResourceNames(proposal));
+const source = (names: readonly unknown[] | undefined) => resourceSource(names);
+const normalize = (names: readonly unknown[] | undefined, proposal: readonly unknown[]) => resourceNormalize(names, proposal);
 const decoded = (names: readonly unknown[] | undefined, proposal: readonly unknown[]) => decodeResourceScope(normalize(names, proposal));
 describe("verified full-declaration resource policy", () => {
   it("checks the omitted 65th identity against the original, not a producer count", () => {
     const original = [...Array.from({ length: 64 }, (_, i) => `r${i}`), "shared"];
     const normalized = normalize(original, original.slice(0, 64));
-    expect(normalized).toEqual({ $: "Unknown" });
+    expect(normalized).toEqual({ exact: false, names: [] });
     expect(resourceConflict(source(original), source(["shared"]), true, false)).toBe(true);
     expect(resourceConflict(normalized, source(["shared"]), true, false)).toBe(true);
     expect(boundedEffectResources(original)).toEqual(["*"]);
@@ -21,7 +22,11 @@ describe("verified full-declaration resource policy", () => {
     expect(decoded(["path:abcdef"], ["path:abc"])).toEqual(["*"]);
     expect(decoded(["a"], [])).toEqual(["*"]);
     expect(decoded(["a"], ["*"])).toEqual(["*"]);
-    expect(decoded(["a"], Array(65).fill("a"))).toEqual(["*"]);
+    // The bound counts distinct names: repeated entries are one name of the set.
+    expect(decoded(["a"], Array(65).fill("a"))).toEqual(["a"]);
+    const distinct = Array.from({ length: 65 }, (_, i) => `r${i}`);
+    expect(decoded(distinct, distinct)).toEqual(["*"]);
+    expect(decoded(distinct.slice(0, 64), distinct.slice(0, 64))).toEqual(distinct.slice(0, 64));
     expect(decoded(["a".repeat(257)], ["a".repeat(256)])).toEqual(["*"]);
     expect(decoded(["a".repeat(257)], ["a".repeat(257)])).toEqual(["*"]);
     expect(decoded(["a".repeat(256)], ["a".repeat(256)])).toEqual(["a".repeat(256)]);
@@ -34,8 +39,8 @@ describe("verified full-declaration resource policy", () => {
     expect(decoded(original, ["a", "b"])).toEqual(["a", "b"]);
     for (const proposal of [["b", "a"], ["a", "b"], ["b"], []]) {
       const normalized = normalize(original, proposal);
-      expect(resourceNormalize(normalized, encodeResourceNames(proposal))).toEqual(normalized);
       const names = decodeResourceScope(normalized);
+      expect(resourceNormalize(names, proposal)).toEqual(normalized);
       expect(boundedEffectResources(names)).toEqual(names);
     }
     const sixtyFour = Array.from({ length: 64 }, (_, i) => `r${i}`);
@@ -43,7 +48,8 @@ describe("verified full-declaration resource policy", () => {
   });
   it("preserves every UTF-16 code unit, including NUL and lone surrogates", () => {
     const units = Array.from({ length: 65536 }, (_, i) => String.fromCharCode(i)).join("");
-    expect(decodeResourceScope({ $: "Exact", names: encodeResourceNames([units]) })).toEqual([units]);
+    expect(decodeResourceScope(source([units]))).toEqual([units]);
+    expect(decoded([units], [units])).toEqual(["*"]);
     const names = ["\0", "\0*", "a\0b", "\ud800", "\udfff", "\ufffd", "😀", "é", "e\u0301"];
     for (const left of names) for (const right of names) {
       expect(resourceConflict(source([left]), source([right]), true, false)).toBe(left === right);
@@ -51,8 +57,8 @@ describe("verified full-declaration resource policy", () => {
     }
   });
   it("maps source classifications and ordering fields into conflict decisions", () => {
-    // Universal refinement/preservation lives in PROOF.bend. These fixed
-    // vectors exercise the JS encoder and both ordering argument positions.
+    // Universal refinement and conflict laws live in proofs/resources.ts. These
+    // fixed vectors exercise the interning codec and both ordering positions.
     const cases = [
       [["a"], ["a"], true, false, true],
       [["a"], ["b"], true, true, false],

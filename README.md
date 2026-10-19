@@ -176,7 +176,7 @@ See the [interface & commands reference](docs/interface.md) for every view, keyb
 - [Components & committed capabilities](docs/components.md): supervised effects, exact requirements, external per-model guidance and execution-profile replacement, rolling provider generations, actor commitments, and both formal calculi.
 - [External providers](docs/providers.md): the versioned provider protocol for extensions.
 - [Architecture & security](docs/architecture.md): the host bridge, sandboxing, tool-call robustness, and limits.
-- [Verified policy kernels](docs/verified-kernels.md): executable Bend proofs, production acceptance gates, regeneration, and the trusted boundary.
+- [Verified policy kernels](docs/verified-kernels.md): gdp-wired laws over the executed rules, production acceptance gates, regeneration, and the trusted boundary.
 - [Provider capabilities](docs/provider-capabilities.md): proved dispatch, authority attenuation, lifecycle transitions, cancellation/cleanup contracts, and trust boundaries.
 - [Catalog repairs](docs/repairs.md): unique extra keys and unknown actions promoted into silent schema maps.
 - [Tool entropy](docs/entropy.md): static capability-preserving normal forms, deterministic invocation-friction metrics, bounded repair witnesses, and offline `certify:entropy` proof checks.

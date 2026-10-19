@@ -44,18 +44,8 @@ jobs:
           fi
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Install pinned Bend proof compiler
+      - name: Prove kernels, refuse broken variants, and reproduce executable kernels
         if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          curl --proto '=https' --tlsv1.2 -fsSL -o "$RUNNER_TEMP/bend.tar.gz" https://github.com/bendlang/bend/releases/download/v2.0.37/bend-2.0.37-linux-x64.tar.gz
-          echo "84c32465a39bc9ac315eade23f470cb8db03153dc860f89564fcfec153c3e445  $RUNNER_TEMP/bend.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/bend/bin" >> "$GITHUB_PATH"
-      - name: Check proofs, reproduce executable kernels, and reject invalid mutations
-        if: runner.os == 'Linux'
-        env:
-          BEND_NO_TELEMETRY: '1'
         run: bun run proof:check
       - name: Type check
         run: bun run typecheck

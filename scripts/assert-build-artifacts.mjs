@@ -140,6 +140,14 @@ for (const [source, expected] of Object.entries(JSON.parse(sourceReceipt).output
   const actual = createHash("sha256").update(readFileSync(join(root, artifact))).digest("hex");
   if (actual !== expected) throw new Error(`Bundled verified artifact differs: ${artifact}`);
 }
+// The prover is a build-time dependency: Fabric ships only the compiled kernels.
+const distFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+  entry.isDirectory() ? distFiles(join(dir, entry.name)) : entry.name.endsWith(".js") ? [join(dir, entry.name)] : []);
+for (const file of distFiles(dist)) {
+  if (/(?:from\s*|import\s*\(\s*)["']gdp-wired(?:\/[^"']*)?["']/.test(readFileSync(file, "utf8"))) {
+    throw new Error(`Published bundle loads the gdp-wired prover: ${file}`);
+  }
+}
 
 const chunks = join(dist, "chunks");
 const chunkFiles = existsSync(chunks)

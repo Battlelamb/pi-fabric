@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActionRegistry } from "../src/core/action-registry.js";
 import { FabricSpeculationStore } from "../src/speculation/store.js";
-import * as kernel from "../src/verified/generated/provider-kernel.js";
-import type { StateText } from "../src/verified/generated/provider-kernel.js";
+import * as kernel from "../src/verified/provider.js";
+import { providerTicket } from "../src/verified/generated/provider.js";
 import type { FabricActionDescriptor, FabricInvocationContext, FabricProvider, FabricScopedProviderResult } from "../src/protocol.js";
 
 const context: FabricInvocationContext = { cwd: process.cwd(), signal: undefined, parentToolCallId: "proof", nestedToolCallId: "proof", extensionContext: {} as FabricInvocationContext["extensionContext"], update() {} };
@@ -19,16 +19,15 @@ const invoke = (registry: ActionRegistry, ctx: Partial<FabricInvocationContext> 
 const speculative = (registry: ActionRegistry) => { const store = new FabricSpeculationStore({ maxConcurrent: 2, maxEntries: 4, entryTtlMs: 1000 }); registry.setSpeculation(store, () => true); return store; };
 afterEach(async () => { await Promise.all(registries.splice(0).map(registry => registry.close())); vi.restoreAllMocks(); });
 
-const encode = (text: string): StateText => { let value: StateText = { $: "Nil" }; for (let i = text.length - 1; i >= 0; i--) value = { $: "Con", head: text.charCodeAt(i), tail: value }; return value; };
 describe("compiled provider plans", () => {
   it("preserves ticket fields, exact text and consumed outcome encodings", () => {
-    // Safety, completeness and consumption are universal Bend laws. Keep
+    // Safety, completeness and consumption are universal gdp-wired laws. Keep
     // field-distinguishing wire examples rather than crossing every failure.
-    const ticket: kernel.ProviderTicket = { $: "Ticket", grant: { $: "Grant", active: true, key: encode("a") }, expected: encode("1"), payload: encode("slot\0😀\udfff") };
-    const write = { $: "Write", key: encode("a"), expected: encode("1"), value: ticket.payload };
+    const ticket: kernel.ProviderTicket = { active: true, key: "a", expected: "1", payload: "slot\0😀\udfff" };
+    const write = { $: "Write", key: "a", expected: "1", value: ticket.payload };
     const cases = [
       { ticket, key: "a", revision: "1", stopped: false, plan: write },
-      { ticket: { ...ticket, grant: { ...ticket.grant, active: false } }, key: "a", revision: "1", stopped: false, plan: { $: "Denied" } },
+      { ticket: { ...ticket, active: false }, key: "a", revision: "1", stopped: false, plan: { $: "Denied" } },
       { ticket, key: "a", revision: "1", stopped: true, plan: { $: "Denied" } },
       { ticket, key: "ab", revision: "1", stopped: false, plan: { $: "Denied" } },
       { ticket, key: "a\0", revision: "1", stopped: false, plan: { $: "Denied" } },
@@ -39,13 +38,16 @@ describe("compiled provider plans", () => {
     ];
     for (const row of cases) {
       const before = structuredClone(row.ticket);
-      const result = kernel.providerTake(row.ticket, encode(row.key), encode(row.revision), row.stopped);
+      const result = kernel.providerTake(row.ticket, row.key, row.revision, row.stopped);
       expect(result.plan).toEqual(row.plan);
-      expect(result.next).toEqual({ ...row.ticket, grant: { ...row.ticket.grant, active: false } });
-      expect(kernel.providerTake(result.next, encode("a"), encode("1"), false).plan).toEqual({ $: "Denied" });
+      expect(result.next).toEqual({ ...row.ticket, active: false });
+      expect(kernel.providerTake(result.next, "a", "1", false).plan).toEqual({ $: "Denied" });
       expect(row.ticket).toEqual(before);
     }
-    expect(kernel.providerTake(kernel.providerRevoke(ticket), encode("a"), encode("1"), false).plan).toEqual({ $: "Denied" });
+    expect(kernel.providerTake(kernel.providerRevoke(ticket), "a", "1", false).plan).toEqual({ $: "Denied" });
+    // The same string as key, revision and payload stays one identity, not a collision.
+    expect(kernel.providerTake({ active: true, key: "x", expected: "x", payload: "x" }, "x", "x", false).plan)
+      .toEqual({ $: "Write", key: "x", expected: "x", value: "x" });
   });
 });
 
@@ -107,10 +109,11 @@ describe("universal registry migration", () => {
   });
 
   it.each([...families, "thirdparty"])("gates %s registrations through the actual compiled kernel", async name => {
-    const take = vi.spyOn(kernel, "providerTake");
+    const step = vi.spyOn(providerTicket, "step");
+    const takes = () => step.mock.calls.filter(([, , input]) => (input as { op: number }).op === 0).length;
     const registry = create(); const { provider } = fixture(name); registry.register(provider);
     expect(await invoke(registry, {}, { payload: "test" }, `${name}.run`)).toEqual({ payload: "test" });
-    expect(take).toHaveBeenCalledOnce(); expect(provider.invoke).toHaveBeenCalledOnce();
+    expect(takes()).toBe(1); expect(provider.invoke).toHaveBeenCalledOnce();
     registry.revokeProvider(name);
     await expect(invoke(registry, {}, {}, `${name}.run`)).rejects.toThrow();
     expect(provider.invoke).toHaveBeenCalledOnce();
