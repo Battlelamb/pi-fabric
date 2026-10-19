@@ -115,7 +115,7 @@ repeats one name 65 times is that one name. Precision assumes a valid, bounded,
 set-equivalent proposal (`resource_precision`). A broken producer can still
 cause a conservative false positive, but it cannot create false independence.
 
-Two claims are compositions of proven laws rather than standalone theorems:
+Two claims are compositions of proven laws, each stated through the laws it combines:
 
 - **Conflict preservation.** `resource_refinement` gives a normalized scope that
   is either unknown or names exactly the original set. Unknown scopes of
@@ -136,7 +136,7 @@ tested; it is not itself proved.
 - `authority_child_use_safe` composes `authority_derive_safe` (a live child's
   grants are within its parent's) with `authority_use_safe` (a granted use
   names a held grant). The two-step form exceeds what the prover instantiates
-  today, so the claim is stated as this composition rather than weakened.
+  today, so the claim is stated as this composition, at full strength.
 - The compaction cut is checked as a fold: one header step, then one step per
   call/result span. `cut_sound` is an invariant over every run. `span_sound`
   shows that a span keeps the cut open only if the cut was open and the span is
