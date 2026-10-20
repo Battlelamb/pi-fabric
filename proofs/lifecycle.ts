@@ -20,7 +20,7 @@ export type LifecycleBug =
 // Closed admit nothing, Failed admits cleanup only, the rest admit cleanup or unrevoked work.
 const Open = (phase: any, revoked: any, cleanup: any) =>
   phase.eq(CLOSING).or(phase.eq(CLOSED)).not().and(phase.eq(FAILED).implies(cleanup), cleanup.or(revoked.eq(0)));
-const retiredPhase = (phase: any) => when(phase.eq(STAGED).or(phase.eq(ACTIVE)), RETIRING, phase);
+const retiredPhase = (phase: any) => when(phase.eq(STAGED).or(phase.eq(ACTIVE)), phase.of("Retiring"), phase);
 
 // Phases that admit ordinary work, and the rest.
 const WORK = ["Staged", "Active", "Retiring"], SETTLED = ["Retiring", "Closing", "Closed", "Failed"], EVERY = [...PHASES];
@@ -59,11 +59,7 @@ export const lifecycle = (bug?: LifecycleBug) => {
 };
 
 export const lifecycleKernels = (bug?: LifecycleBug): Kernel[] => {
-  const c = lifecycle(bug);
-  // The chart's phase and command are choices encoded by declaration order; the laws read them as those indices.
-  const nums = (env: any) => Object.assign(Object.create(null), env, { phase: env.phase.n, command: env.command.n });
-  const r = { stepLaw: (name: string, then: (b: any, a: any) => any, when?: (b: any) => any) =>
-    c.rule.stepLaw(name, (b: any, a: any) => then(nums(b), nums(a)), when && ((b: any) => when(nums(b)))) };
+  const c = lifecycle(bug), r = c.rule;
   type E = any;
   const unchanged = (b: E, a: E) => all(a.phase.eq(b.phase), a.owner.eq(b.owner), a.holds.eq(b.holds), a.calls.eq(b.calls), a.revoked.eq(b.revoked));
   const life = (a: E, phase: E, owner: E, holds: E, calls: E, revoked: E) =>
