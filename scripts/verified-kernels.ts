@@ -73,6 +73,11 @@ for (const module of modules) {
       const replay = crossCheckDecision(decision);
       if (replay.failure) failures.push(`${kernel.id}: ${decision.name}: builders disagree with the interpreter: ${replay.failure}`);
     }
+    if (kernel.chart) {
+      const report = kernel.chart.check();
+      const unreached = Object.entries(report.reached).filter(([, run]) => typeof run === "string").map(([state]) => state);
+      if (!report.ok) failures.push(`${kernel.id}: chart check failed (unreached: ${unreached.join(", ") || "none"}; stuck: ${report.stuck.join(", ") || "none"}; ambiguous: ${report.ambiguous.map((a) => a.event).join(", ") || "none"})`);
+    }
     console.log(`proved ${module.stem}.${kernel.id} (${Date.now() - started} ms)`);
   }
   // A variant's kernel that compiles to the shipped machine was proven above and

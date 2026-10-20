@@ -54,7 +54,10 @@ registered module:
 3. Replays every claim on concrete runs with `crossCheck` and
    `crossCheckDecision`. The builders are untrusted, so this catches a builder
    whose expression differs from what its callback computed.
-4. Compiles each shipped machine with gdp-wired's `compileJs`. Each runtime
+4. Runs each statechart's `check()`. Every state must be reachable from the
+   start, no state other than a final one may lack a way out, and no event may
+   enable two equally specific transitions at once.
+5. Compiles each shipped machine with gdp-wired's `compileJs`. Each runtime
    helper a module's machines call is emitted once, and host access is refused.
    `fork` (a state copy for branching searches) is left out, because Fabric
    never branches; `init` and `step` ship unchanged.
@@ -220,7 +223,12 @@ postcondition commands are not formally verified.
 ### Lifecycle limits
 
 Provider bindings run the compiled lifecycle reducer for admission, holds,
-in-flight work, retirement, revocation and close reservation. Independent laws
+in-flight work, retirement, revocation and close reservation. The reducer is a
+gdp-wired statechart: a table of transitions over the six phases, where Closed
+and Failed are final and counter updates stay in their phase. Its `command` is
+an output that reads Denied whenever no transition fires. The chart compiles to
+the rule that ships, and its check proves every phase reachable, none stuck
+and no event ambiguous. Independent laws
 prove exact count updates and prevent close while ownership remains. The host
 interprets commands, observes actual promise settlement and releases private
 one-use leases. Those observations and interpreter effects remain trusted.
