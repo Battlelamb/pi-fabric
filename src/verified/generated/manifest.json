@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "prover": "gdp-wired@0.12.2",
+  "prover": "gdp-wired@0.12.3",
   "inputs": {
     "proofs/index.ts": "d9e2c3f14979dea32bfbd42d2c844ba00ac714e48cbe665d1b9e664e08c60505",
     "proofs/kernel.ts": "c2f7a54f611c859256de1ab0badcb698ee8c8148dc1f2847d683acd1dd71b795",
@@ -14,20 +14,20 @@
     "scripts/verified-kernels.ts": "193e8a49557c80cad81ba59fec0f68d47ca55a5d72effafd8bfe75b45041e301"
   },
   "outputs": {
-    "src/verified/generated/policy.js": "48751dfd6149c8595833324e653e2c70d385e2443527ba5813c6bbfe223a23b3",
-    "src/verified/generated/policy.d.ts": "40abc7edfe6b9cb57b2d02a4955874ed90739b1381e24cfa731e960b39a88fa3",
-    "src/verified/generated/compaction.js": "e585df826a5332f16d3f91db234bb34544eacc6222db08e2810c565bbea6c5b0",
-    "src/verified/generated/compaction.d.ts": "deb8f430f9aa2ed8d31cf41a5a299d3bea42a4057bfbae962ddcf4e71be1b204",
-    "src/verified/generated/resources.js": "1fb0e920700780e8c9ba3b9b31a41b6b4524f751895a9058e4d3644dce972397",
-    "src/verified/generated/resources.d.ts": "76e1e2fbaa2425916d8499a3c4b873290c931b773bc71025b5c18d2e309eb93b",
-    "src/verified/generated/lifecycle.js": "5b3f1810fba17ee54fae3d3a8a87fa10561aede4bcdd65887c48943342a2160b",
-    "src/verified/generated/lifecycle.d.ts": "a58390f1a820d5d55292061f52aae787ae7ee8bf113cf6368367272878477bb8",
-    "src/verified/generated/storage.js": "85c443bd66103c0593534d56d12225ce41d69a897e8aa48aab847d35852babd5",
-    "src/verified/generated/storage.d.ts": "44c53f46fb251a97549ea2ab067d4beff8e61cc6070c1b66b53619936bac7d25",
-    "src/verified/generated/provider.js": "85677fe8d38135a4bf42d88e086ac38e7017e044adddb3176cee916108a01775",
-    "src/verified/generated/provider.d.ts": "48b08a0b4c3cee6f81806b5292548ce0f4cdcca8c8f45190e77d5b1b96c7ce72",
-    "src/verified/generated/authority.js": "98f5593bb8d5c4c8cb6c834e294090f4f036d8b074ce81a943a067d75bc12cb8",
-    "src/verified/generated/authority.d.ts": "fde51388f9ed39b60489674cd51abe336cbdbb3934495ba900e802893badcaaf"
+    "src/verified/generated/policy.js": "9c464c44c7e376097e5df6c274ca4ccff333cad1ae92619dc17a275427dbedb0",
+    "src/verified/generated/policy.d.ts": "a9f71f09ad846ce3dedcff4e9b0418f96eb9978abf34992a93fdc41921c9eb44",
+    "src/verified/generated/compaction.js": "4d3fcc2c7a896456e6f7b5ec640e5f37e4631754c90767f70aac52d526f62a39",
+    "src/verified/generated/compaction.d.ts": "541b3658979d897b41e9000fb3424a73e3693ff07e925cea8795015c2a5d460c",
+    "src/verified/generated/resources.js": "26ae1c9d330b317caf7fde97c9b77b8b77982d78b72a78878feb9b7fb9368c8d",
+    "src/verified/generated/resources.d.ts": "49d79430bd10dd36d87f9508d6270083dc9c5ae0888ed2495b2e073494082ae2",
+    "src/verified/generated/lifecycle.js": "dd92485c4de68ebf358ec5ebbb0fc1a8a25f7ebb1b00001a87466559fdfa7c23",
+    "src/verified/generated/lifecycle.d.ts": "beecc75c480e760f106c44c2b39affbd9b2eccb569100836cb38ee852ec25e5e",
+    "src/verified/generated/storage.js": "af00345fa10c63dfab82b77b716fcb716ae3c20f1fd1468376e4d67a31c404f7",
+    "src/verified/generated/storage.d.ts": "9663a4b5b87e3e25cff27760c8c2e896051a6726bed6e9772eedf22862d6c1aa",
+    "src/verified/generated/provider.js": "045f46fccab098f58055258d43b6943f13d6da2a40a8dc24fd209be9e877c940",
+    "src/verified/generated/provider.d.ts": "d631c9f471173cf863152adca80e21e15990086f661e7425837c0fe00d5d523c",
+    "src/verified/generated/authority.js": "09408e031761f17a1c07d060e20c4cce460bdbb8768fd67dcf00d47a53dbb88c",
+    "src/verified/generated/authority.d.ts": "e97b89665f32648c41ac78d7e916c658285374ca5b051447d2ca993bc2d9f7e1"
   },
   "claims": {
     "policy": [
