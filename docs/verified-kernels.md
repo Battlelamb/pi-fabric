@@ -133,8 +133,8 @@ Two components' effects are decided over every pair at once by
 `resourceGroups`. Each side is a list of effect flags (`effect`, `ordered`,
 `exact`) and a list of rows (`item`, `name`), one row per name in an exact
 scope, where `item` is the effect's position in its list. A row reads its
-effect at the position it names, so the pairing of a name with its effect is
-the request's data rather than a loop's. The groups conflict unless no ordered
+effect at the position it names, so the request's own data pairs each name
+with its effect; no loop does. The groups conflict unless no ordered
 pair of effects has an unknown scope and no ordered pair of rows names one
 resource. Four laws cover both directions: independent groups have neither kind
 of pair (`resource_groups_known`, `resource_groups_unshared`), and a pair of
@@ -146,8 +146,8 @@ check one side against itself are each refused.
 The codec stays trusted: it names both sides' rows from one shared table, and
 writes each row's `item` as its effect's position. The rule assumes every row
 names an effect of its own side. The codec meets that by construction, and the
-compiled step throws a `RangeError` on a request that fails it rather than
-granting independence. The shared-name condition runs as a join on the name,
+compiled step throws a `RangeError` on a request that fails it, so such a
+request never grants independence. The shared-name condition runs as a join on the name,
 so its cost grows with the rows and their matches, not with every pair of rows.
 
 ### Multi-step claims
