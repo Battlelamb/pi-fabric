@@ -75,8 +75,13 @@ for (const module of modules) {
     }
     console.log(`proved ${module.stem}.${kernel.id} (${Date.now() - started} ms)`);
   }
+  // A variant's kernel that compiles to the shipped machine was proven above and
+  // cannot refuse it; skipping it only makes a refusal harder to reach.
+  const compiled = (kernel: (typeof kernels)[number]) => compileJs((kernel.rule ?? kernel.fun?.rule)!.machine);
+  const shipped = new Map(kernels.map((kernel) => [kernel.id, compiled(kernel)]));
   for (const bug of module.bugs) {
-    if (module.kernels(bug).flatMap(prove).every((verdict) => verdict.proven)) failures.push(`${module.stem}: broken variant "${bug}" was not refused`);
+    const refused = module.kernels(bug).some((kernel) => compiled(kernel) !== shipped.get(kernel.id) && prove(kernel).some((verdict) => !verdict.proven));
+    if (!refused) failures.push(`${module.stem}: broken variant "${bug}" was not refused`);
   }
   console.log(`refused ${module.bugs.length} broken variants of ${module.stem}`);
 

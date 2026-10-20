@@ -11,7 +11,7 @@
     "proofs/storage.ts": "5428833c8d71be81947159c8d09fcf31989809da4f09156c7f10cc0291a7df84",
     "proofs/provider.ts": "f067052d8571c79ac9880692aa33a4a794744d3c586db53afd89d466db5659cc",
     "proofs/authority.ts": "b9ee6a4dc95ba3783879423ecf61eaf2256ac62805927ca5b8ba1f390e53cf56",
-    "scripts/verified-kernels.ts": "6f1f53b66447288db27cd950b986234681b862a6015ec86fb8e1aa21b9cc9bea"
+    "scripts/verified-kernels.ts": "3a3de6282ff826a4ca527e32248062d8302f8384e34343bf5422d857f7ee1202"
   },
   "outputs": {
     "src/verified/generated/policy.js": "189da4db26211036499a40745eae03a5df23ce85d8f14879b7188df896fb03d4",
