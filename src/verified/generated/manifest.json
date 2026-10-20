@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "prover": "gdp-wired@0.7.0",
+  "prover": "gdp-wired@0.12.2",
   "inputs": {
     "proofs/index.ts": "d9e2c3f14979dea32bfbd42d2c844ba00ac714e48cbe665d1b9e664e08c60505",
     "proofs/kernel.ts": "c2f7a54f611c859256de1ab0badcb698ee8c8148dc1f2847d683acd1dd71b795",
@@ -14,20 +14,20 @@
     "scripts/verified-kernels.ts": "193e8a49557c80cad81ba59fec0f68d47ca55a5d72effafd8bfe75b45041e301"
   },
   "outputs": {
-    "src/verified/generated/policy.js": "6ce44289a28d41db6cc57a6a274ca761120b55b57bae3b2cadb292d082924179",
-    "src/verified/generated/policy.d.ts": "7ca558a828c83f973bd9d818d3459da10d0d4c820c7bc35479931f4be38b2b11",
-    "src/verified/generated/compaction.js": "f43c71d2979ef3e0da8a58efeef5c35156df2da72b1a99fe64a844c9517e540f",
-    "src/verified/generated/compaction.d.ts": "64c313e8c77d54395839d0d366a4f9df373fdf7498bc0948443cbae0b6e917d8",
-    "src/verified/generated/resources.js": "2f6311d94545d9d47429f1c3f093aef6640f34bbcd2a9716f790b0e5cbece908",
-    "src/verified/generated/resources.d.ts": "b29dcd0409b2cb69e68812dae604913808e610ed14ccb241c20cd3923a437043",
-    "src/verified/generated/lifecycle.js": "b509b6848256377dabae48f69a993dca87538b8f069caef5c7638edc93992021",
-    "src/verified/generated/lifecycle.d.ts": "c181d0a1311aea61ec42f9c8433802fc2c8bb2f185258d9e85f088af742a1873",
-    "src/verified/generated/storage.js": "8f9078836dd95e69799a3434682cae6d40f88c4a73e30a139c6ee57f39325040",
-    "src/verified/generated/storage.d.ts": "d1af617336c5a60e6cda6c2e798baec306fd9af9931da2fa3c96edb890170aba",
-    "src/verified/generated/provider.js": "c3c01497cfe4a4fb3b8f82e98cd227910797d95b7d8a85aa61bcfea801a457a4",
-    "src/verified/generated/provider.d.ts": "2cb74826b3a4bb9ae87e7381da7d044ddde7bfe2dea755a1ecd2a6813e0917c8",
-    "src/verified/generated/authority.js": "3b557affa630580a4fe0343f4b2cfa84f3d4611b2c8e258d03b3c5dc2bf9459f",
-    "src/verified/generated/authority.d.ts": "37254e843d86481c543103629ab82095733d60ab87b9fad7d04593dc12ea4e71"
+    "src/verified/generated/policy.js": "48751dfd6149c8595833324e653e2c70d385e2443527ba5813c6bbfe223a23b3",
+    "src/verified/generated/policy.d.ts": "40abc7edfe6b9cb57b2d02a4955874ed90739b1381e24cfa731e960b39a88fa3",
+    "src/verified/generated/compaction.js": "e585df826a5332f16d3f91db234bb34544eacc6222db08e2810c565bbea6c5b0",
+    "src/verified/generated/compaction.d.ts": "deb8f430f9aa2ed8d31cf41a5a299d3bea42a4057bfbae962ddcf4e71be1b204",
+    "src/verified/generated/resources.js": "1fb0e920700780e8c9ba3b9b31a41b6b4524f751895a9058e4d3644dce972397",
+    "src/verified/generated/resources.d.ts": "76e1e2fbaa2425916d8499a3c4b873290c931b773bc71025b5c18d2e309eb93b",
+    "src/verified/generated/lifecycle.js": "5b3f1810fba17ee54fae3d3a8a87fa10561aede4bcdd65887c48943342a2160b",
+    "src/verified/generated/lifecycle.d.ts": "a58390f1a820d5d55292061f52aae787ae7ee8bf113cf6368367272878477bb8",
+    "src/verified/generated/storage.js": "85c443bd66103c0593534d56d12225ce41d69a897e8aa48aab847d35852babd5",
+    "src/verified/generated/storage.d.ts": "44c53f46fb251a97549ea2ab067d4beff8e61cc6070c1b66b53619936bac7d25",
+    "src/verified/generated/provider.js": "85677fe8d38135a4bf42d88e086ac38e7017e044adddb3176cee916108a01775",
+    "src/verified/generated/provider.d.ts": "48b08a0b4c3cee6f81806b5292548ce0f4cdcca8c8f45190e77d5b1b96c7ce72",
+    "src/verified/generated/authority.js": "98f5593bb8d5c4c8cb6c834e294090f4f036d8b074ce81a943a067d75bc12cb8",
+    "src/verified/generated/authority.d.ts": "fde51388f9ed39b60489674cd51abe336cbdbb3934495ba900e802893badcaaf"
   },
   "claims": {
     "policy": [
