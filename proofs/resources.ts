@@ -27,6 +27,12 @@ export const scope = (bug?: ResourceBug) => rule("resource scope")
     fits: everyKey((k) => (bug === "skips backward coverage" ? Names.has(k).implies(Given.has(k)) : Given.has(k).iff(Names.has(k)))
       .and(Given.has(k).implies(all(k.ne(EMPTY), k.ne(WILDCARD), bug === "ignores the bound" ? yes : k.lt(NAMES), bug === "admits long names" ? yes : Len.at(k).atMost(LENGTH))))),
   }))
+  // The specification's recheck: the proposal is the current scope, each name
+  // within 256 code units. Stated apart from `fits`; the step never reads them.
+  .flags(({ Given, Len, Names }) => ({
+    unchanged: everyKey((k) => Given.at(k).eq(Names.at(k))),
+    short: everyKey((k) => Given.has(k).implies(Len.at(k).atMost(LENGTH))),
+  }))
   .flags(({ op, exact, first, Given, identities, fits }) => ({
     accepted: Given.has(first).and(op.match({
       source: () => identities,
@@ -79,9 +85,9 @@ export const resourceKernels = (bug?: ResourceBug): Kernel[] => {
         (_, a) => a.exact.eq(0).and(everyKey((k) => a.Names.at(k).eq(0))), ({ accepted }) => accepted.not()),
       s.stepLaw("resource_precision: a valid bounded set-equivalent proposal is accepted as given (so the identity proposal is unchanged)",
         ({ Given }, a) => a.exact.eq(1).and(same(a.Names, Given)), ({ op, exact, first, Given, fits }) => op.is("normalize").and(exact.eq(1), Given.has(first), fits)),
-      // resource_recheck_idempotent: a first normalization's output is valid,
-      // bounded and equal to its proposal (output_valid, refinement), so a recheck
-      // with the same proposal is precision's identity case.
+      s.stepsLaw("resource_recheck_idempotent: rechecking a normal form against itself keeps it", 2,
+        ({ Given }, last) => last.exact.eq(1).and(same(last.Names, Given)),
+        ({ op, accepted, first, Given, unchanged, short }, j) => (j === 0 ? op.is("normalize").and(accepted) : op.is("normalize").and(unchanged, short, Given.has(first)))),
     ],
   }, {
     id: "resourceConflict",

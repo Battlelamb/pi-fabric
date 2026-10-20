@@ -22,7 +22,7 @@ a set of small policy kernels, **not a proof of every subsystem invariant**.
 
 | Area | Proof module, shipped machine | Authoritative production path | Laws |
 | --- | --- | --- | --- |
-| Effect independence | `resources.ts`: `resourceScope`, `resourceConflict` | `verified/resources.ts`, `components/effect-policy.ts`, `components/effect-scope.ts` | `resource_source_refinement`, `resource_source_valid`, `resource_source_complete`, `resource_refinement`, `resource_output_valid`, `resource_unknown`, `resource_precision`, `resource_pair_sound`, `resource_conflict_exact`, `resource_conflict_complete`, `resource_pair_complete` |
+| Effect independence | `resources.ts`: `resourceScope`, `resourceConflict` | `verified/resources.ts`, `components/effect-policy.ts`, `components/effect-scope.ts` | `resource_source_refinement`, `resource_source_valid`, `resource_source_complete`, `resource_refinement`, `resource_output_valid`, `resource_unknown`, `resource_precision`, `resource_recheck_idempotent`, `resource_pair_sound`, `resource_conflict_exact`, `resource_conflict_complete`, `resource_pair_complete` |
 | Component lifecycle | `policy.ts`: `transitionCurrent`, `cleanupState`, `consume` | `components/supervisor.ts`, `components/effect-scope.ts` | `transition_sound`, `transition_complete`, `cleanup_failure_quarantines`, `consume_once`, `consume_retires` |
 | Capability authority | `authority.ts`: `capabilityAuthority` | `verified/authority.ts`, `core/action-registry.ts` | `authority_issue_exact`, `authority_use_safe`, `authority_use_complete`, `authority_derive_safe`, `authority_derive_complete`, `authority_released_cannot_derive`, `authority_released_not_live`, `authority_released_refused` |
 | Binding lifecycle | `lifecycle.ts`: `bindingStep` | `verified/lifecycle.ts`, `core/provider-bindings.ts`, `core/provider-operations.ts` | 19 step laws: safety, `Open`-based completeness, exact counts, close reservation, quarantine |
@@ -54,8 +54,8 @@ registered module:
 3. Replays every claim on concrete runs with `crossCheck` and
    `crossCheckDecision`. The builders are untrusted, so this catches a builder
    whose expression differs from what its callback computed.
-4. Compiles each shipped machine with gdp-wired's `compileJs`. The shared
-   runtime helpers are emitted once per module, and host access is refused.
+4. Compiles each shipped machine with gdp-wired's `compileJs`. Each runtime
+   helper a module's machines call is emitted once, and host access is refused.
    `fork` (a state copy for branching searches) is left out, because Fabric
    never branches; `init` and `step` ship unchanged.
    The step writes `src/verified/generated/<module>.js`, its declarations, and
@@ -115,17 +115,18 @@ repeats one name 65 times is that one name. Precision assumes a valid, bounded,
 set-equivalent proposal (`resource_precision`). A broken producer can still
 cause a conservative false positive, but it cannot create false independence.
 
-Two claims are compositions of proven laws, each stated through the laws it combines:
+Rechecking an accepted normal form against itself keeps it
+(`resource_recheck_idempotent`). This is a two-step law: a normalization is
+accepted, then the next normalization's proposal is the current scope. Two spec
+flags, `unchanged` and `short`, state that proposal apart from `fits`; the step
+never reads them.
 
-- **Conflict preservation.** `resource_refinement` gives a normalized scope that
-  is either unknown or names exactly the original set. Unknown scopes of
-  ordered effects conflict (`resource_conflict_complete`). Two exact scopes
-  conflict exactly when they share a name: `resource_conflict_exact` and
-  `resource_pair_complete` cover the two directions. So normalization cannot
-  erase a conflict.
-- **Recheck idempotence.** An accepted normal form is valid, bounded and equal
-  to its proposal (`resource_output_valid`, `resource_refinement`). Rechecking
-  it with the same proposal is the identity case of `resource_precision`.
+Conflict preservation is a composition of proven laws.
+`resource_refinement` gives a normalized scope that is either unknown or names
+exactly the original set. Unknown scopes of ordered effects conflict
+(`resource_conflict_complete`). Two exact scopes conflict exactly when they
+share a name: `resource_conflict_exact` and `resource_pair_complete` cover the
+two directions. So normalization cannot erase a conflict.
 
 The traversal over every pair of effects (`resourceGroups`) is a short
 TypeScript loop around the compiled pairwise decision. It is trusted and
@@ -257,8 +258,9 @@ gdp-wired changed these claims:
   coverage are proven over sets of ids, and the codec's injectivity is trusted.
   A resource name's length is the codec's `string.length`.
 - The resource bound counted list entries. It now counts distinct names.
-- Pairwise effect traversal, the authority child-use theorem, and recheck
-  idempotence are compositions, as described above.
+- Pairwise effect traversal and the authority child-use theorem are
+  compositions, as described above. Recheck idempotence is a proven two-step
+  law.
 - Several laws no longer apply. `all_sound` and `all_complete` covered the old
   list conjunction; every predicate is now a direct conjunction with its own
   soundness and completeness laws. `footprint_*` and `close_*` covered
