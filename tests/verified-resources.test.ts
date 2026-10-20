@@ -3,6 +3,7 @@ import {
   boundedEffectResources, decodeResourceScope, resourceConflictOf as resourceConflict, resourceGroups, resourceNormalize, resourceSource,
   type ResourceEffect,
 } from "../src/verified/resources.js";
+import { resourceGroups as resourceGroupsMachine } from "../src/verified/generated/resources.js";
 import { effectConflictsBetween, summarizeEffects } from "../src/components/effect-policy.js";
 
 const source = (names: readonly unknown[] | undefined) => resourceSource(names);
@@ -125,5 +126,14 @@ describe("verified full-declaration resource policy", () => {
       ({ effect: true, ordered: true, scope: { exact: true, names: i === 255 ? [last] : [`${tag}${i}`] } }));
     expect(resourceGroups(side("l", "shared"), side("r", "shared"))).toBe(true);
     expect(resourceGroups(side("l", "left"), side("r", "right"))).toBe(false);
+  });
+  it("refuses a row that names no effect of its side instead of granting independence", () => {
+    const empty = new Map<number, number>();
+    expect(() => resourceGroupsMachine.step({}, resourceGroupsMachine.init({}), {
+      L_len: 0, R_len: 1, LN_len: 1, RN_len: 1,
+      "L.effect": empty, "L.ordered": empty, "L.exact": empty,
+      "R.effect": new Map([[0, 1]]), "R.ordered": new Map([[0, 1]]), "R.exact": new Map([[0, 1]]),
+      "LN.item": new Map([[0, 5]]), "LN.name": new Map([[0, 2]]), "RN.item": new Map([[0, 0]]), "RN.name": new Map([[0, 2]]),
+    })).toThrow(RangeError);
   });
 });

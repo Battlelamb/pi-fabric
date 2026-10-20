@@ -83,7 +83,8 @@ Kernels decide over naturals, flags, choices and sets of names. The bridges in
   The codec interns a proposal's names first, so they take ids 2..65.
   `Len` carries each name's complete UTF-16 length.
 - Numbers are naturals below `2^53`. The compiled runtime refuses anything else
-  with a `RangeError`, and each bridge fails closed before that point. Storage
+  with a `RangeError`, and each bridge fails closed before that point. It
+  refuses a request that fails its rule's assumption the same way. Storage
   revisions are plain naturals, with no radix limbs.
 
 ### Complete-resource conflict preservation
@@ -144,9 +145,10 @@ check one side against itself are each refused.
 
 The codec stays trusted: it names both sides' rows from one shared table, and
 writes each row's `item` as its effect's position. The rule assumes every row
-names an effect of its own side; the compiled step does not check that
-assumption, so the codec meets it by construction. The rows are quadratic in
-the number of names: two sides of 256 effects with 64 names each take seconds.
+names an effect of its own side. The codec meets that by construction, and the
+compiled step throws a `RangeError` on a request that fails it rather than
+granting independence. The shared-name condition runs as a join on the name,
+so its cost grows with the rows and their matches, not with every pair of rows.
 
 ### Multi-step claims
 
