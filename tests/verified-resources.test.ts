@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  boundedEffectResources, decodeResourceScope, resourceConflictOf as resourceConflict, resourceNormalize, resourceSource,
+  boundedEffectResources, decodeResourceScope, resourceConflictOf as resourceConflict, resourceGroups, resourceNormalize, resourceSource,
+  type ResourceEffect,
 } from "../src/verified/resources.js";
 import { effectConflictsBetween, summarizeEffects } from "../src/components/effect-policy.js";
 
@@ -97,5 +98,32 @@ describe("verified full-declaration resource policy", () => {
     expect(effectConflictsBetween(summarizeEffects(left), summarizeEffects(right))).toEqual([{ resources: ["shared"], reason: "shared_resource" }]);
     expect(effectConflictsBetween(summarizeEffects([quiet]), summarizeEffects([effect("a")]))).toEqual([]);
     expect(effectConflictsBetween(summarizeEffects([effect("*", false)]), summarizeEffects([effect("a", false)]))).toEqual([]);
+  });
+  it("decides groups as checking every pair of effects would", () => {
+    // The groups laws live in proofs/resources.ts; this replays the codec (one
+    // shared name table, rows by effect position) against the pairwise kernel.
+    let seed = 7;
+    const draw = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor((seed / 2 ** 31) * k); };
+    const held = (): ResourceEffect => ({
+      effect: draw(4) > 0, ordered: draw(2) === 1,
+      scope: draw(5) === 0 ? { exact: false, names: [] } : { exact: true, names: [...new Set(Array.from({ length: draw(3) + 1 }, () => `r${draw(4)}`))] },
+    });
+    const pairs = (left: ResourceEffect[], right: ResourceEffect[]) =>
+      left.some((l) => right.some((r) => l.effect && r.effect && resourceConflict(l.scope, r.scope, l.ordered, r.ordered)));
+    let conflicts = 0;
+    for (let run = 0; run < 2000; run++) {
+      const left = Array.from({ length: draw(5) }, held), right = Array.from({ length: draw(5) }, held);
+      const expected = pairs(left, right);
+      expect(resourceGroups(left, right)).toBe(expected);
+      if (expected) conflicts++;
+    }
+    expect(conflicts).toBeGreaterThan(200);
+    expect(conflicts).toBeLessThan(1800);
+  });
+  it("finds a conflict between the last effects of large groups", () => {
+    const side = (tag: string, last: string): ResourceEffect[] => Array.from({ length: 256 }, (_, i) =>
+      ({ effect: true, ordered: true, scope: { exact: true, names: i === 255 ? [last] : [`${tag}${i}`] } }));
+    expect(resourceGroups(side("l", "shared"), side("r", "shared"))).toBe(true);
+    expect(resourceGroups(side("l", "left"), side("r", "right"))).toBe(false);
   });
 });

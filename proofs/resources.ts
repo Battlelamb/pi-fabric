@@ -2,14 +2,15 @@
 // empty (or malformed) name, 1 is the wildcard "*", and every other string gets
 // its own id. A scope is a set of ids; `Len` carries each name's UTF-16 length.
 // The codec interns a proposal's names first, so ids 2..65 hold up to 64 names.
-import { all, bool, everyKey, nat, oneOf, rule, when, yes } from "gdp-wired";
+import { all, bool, everyKey, forall, nat, oneOf, record, rule, when, yes } from "gdp-wired";
 import type { Kernel } from "./kernel.js";
 
 export const EMPTY = 0, WILDCARD = 1, LIMIT = 64, NAMES = 2 + LIMIT, LENGTH = 256;
 
 export type ResourceBug =
   | "skips backward coverage" | "admits the wildcard" | "keeps an unknown source"
-  | "admits long names" | "ignores the bound" | "commutative effects conflict" | "unknown scopes are independent";
+  | "admits long names" | "ignores the bound" | "commutative effects conflict" | "unknown scopes are independent"
+  | "pairs only the diagonal" | "skips the last left effect" | "checks only the first right effect" | "checks one side against itself";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const same = (a: any, b: any) => everyKey((k) => a.at(k).eq(b.at(k)));
@@ -62,8 +63,37 @@ export const conflict = (bug?: ResourceBug) => rule("resource conflict")
       bug === "unknown scopes are independent" ? leftExact.and(rightExact, shared) : leftExact.and(rightExact).not().or(shared)), 1, 0),
   }));
 
+// Two components' effects, decided over every pair at once. Each side is a list
+// of effects plus rows (item, name) for its exact scopes, where `item` is the
+// effect's position in its list: a row reads its effect at the position it
+// names, so which name belongs to which effect is the request's own data.
+// The codec names both sides' rows from one shared table.
+const Effect = record({ effect: bool, ordered: bool, exact: bool });
+const Row = record({ item: nat, name: nat });
+export const groups = (bug?: ResourceBug) => rule("resource groups")
+  .carriesList("L", Effect).carriesList("R", Effect).carriesList("LN", Row).carriesList("RN", Row)
+  .state({ conflict: 0 })
+  .flags(({ L, R, LN, RN }) => {
+    const right = bug === "checks one side against itself" ? L : R, rightN = bug === "checks one side against itself" ? LN : RN;
+    const ordered = (l: any, r: any) => all(l.effect, r.effect, l.ordered.or(r.ordered));
+    return {
+      // Every row names an effect of its group.
+      rows: everyKey((p) => p.lt(LN.len).implies(LN.at(p).item.lt(L.len))).and(everyKey((q) => q.lt(RN.len).implies(RN.at(q).item.lt(R.len)))),
+      // No ordered pair of effects with an unknown scope.
+      known: everyKey((i, j) => all(i.lt(bug === "skips the last left effect" ? L.len.minus(1) : L.len), j.lt(bug === "checks only the first right effect" ? 1 : right.len),
+        bug === "pairs only the diagonal" ? i.eq(j) : yes)
+        .implies(all(ordered(L.at(i), right.at(j)), L.at(i).exact.and(right.at(j).exact).not()).not())),
+      // No ordered pair of effects naming one resource.
+      unshared: everyKey((p, q) => all(p.lt(LN.len), q.lt(rightN.len), LN.at(p).name.eq(rightN.at(q).name),
+        bug === "pairs only the diagonal" ? LN.at(p).item.eq(rightN.at(q).item) : yes)
+        .implies(ordered(L.at(LN.at(p).item), right.at(rightN.at(q).item)).not())),
+    };
+  })
+  .assume(({ rows }) => rows)
+  .step(({ known, unshared }) => ({ conflict: when(known.and(unshared), 0, 1) }));
+
 export const resourceKernels = (bug?: ResourceBug): Kernel[] => {
-  const s = scope(bug), c = conflict(bug);
+  const s = scope(bug), c = conflict(bug), g = groups(bug);
   const valid = (Names: any, first: any) => Names.has(first).and(everyKey((k) => Names.has(k).implies(k.ne(EMPTY).and(k.ne(WILDCARD)))));
   return [{
     id: "resourceScope",
@@ -104,9 +134,27 @@ export const resourceKernels = (bug?: ResourceBug): Kernel[] => {
         (_, a) => a.conflict.eq(1), ({ leftEffect, rightEffect, leftOrdered, rightOrdered, witness, Left, Right }) =>
           all(leftEffect, rightEffect, leftOrdered.or(rightOrdered), Left.has(witness), Right.has(witness))),
     ],
+  }, {
+    id: "resourceGroups",
+    rule: g,
+    stepLaws: [
+      g.stepLaw("resource_groups_known: independent groups have no ordered pair of effects with an unknown scope",
+        ({ L, R }, a) => forall((i, j) => all(a.conflict.eq(0), i.lt(L.len), j.lt(R.len), L.at(i).effect, R.at(j).effect, L.at(i).ordered.or(R.at(j).ordered))
+          .implies(L.at(i).exact.and(R.at(j).exact)))),
+      g.stepLaw("resource_groups_unshared: independent groups have no ordered pair of effects naming one resource",
+        ({ L, R, LN, RN }, a) => forall((p, q) => all(a.conflict.eq(0), p.lt(LN.len), q.lt(RN.len), LN.at(p).name.eq(RN.at(q).name), L.at(LN.at(p).item).effect, R.at(RN.at(q).item).effect)
+          .implies(L.at(LN.at(p).item).ordered.or(R.at(RN.at(q).item).ordered).not()))),
+      g.stepLaw("resource_groups_unknown_complete: an ordered pair of effects with an unknown scope makes the groups conflict",
+        ({ L, R }, a) => forall((i, j) => all(i.lt(L.len), j.lt(R.len), L.at(i).effect, R.at(j).effect, L.at(i).ordered.or(R.at(j).ordered), L.at(i).exact.and(R.at(j).exact).not())
+          .implies(a.conflict.eq(1)))),
+      g.stepLaw("resource_groups_shared_complete: an ordered pair of effects naming one resource makes the groups conflict",
+        ({ L, R, LN, RN }, a) => forall((p, q) => all(p.lt(LN.len), q.lt(RN.len), LN.at(p).name.eq(RN.at(q).name), L.at(LN.at(p).item).effect, R.at(RN.at(q).item).effect,
+          L.at(LN.at(p).item).ordered.or(R.at(RN.at(q).item).ordered)).implies(a.conflict.eq(1)))),
+    ],
   }];
 };
 export const RESOURCE_BUGS: ResourceBug[] = [
   "skips backward coverage", "admits the wildcard", "keeps an unknown source", "admits long names",
   "ignores the bound", "commutative effects conflict", "unknown scopes are independent",
+  "pairs only the diagonal", "skips the last left effect", "checks only the first right effect", "checks one side against itself",
 ];

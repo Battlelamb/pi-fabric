@@ -22,7 +22,7 @@ a set of small policy kernels, **not a proof of every subsystem invariant**.
 
 | Area | Proof module, shipped machine | Authoritative production path | Laws |
 | --- | --- | --- | --- |
-| Effect independence | `resources.ts`: `resourceScope`, `resourceConflict` | `verified/resources.ts`, `components/effect-policy.ts`, `components/effect-scope.ts` | `resource_source_refinement`, `resource_source_valid`, `resource_source_complete`, `resource_refinement`, `resource_output_valid`, `resource_unknown`, `resource_precision`, `resource_recheck_idempotent`, `resource_pair_sound`, `resource_conflict_exact`, `resource_conflict_complete`, `resource_pair_complete` |
+| Effect independence | `resources.ts`: `resourceScope`, `resourceConflict`, `resourceGroups` | `verified/resources.ts`, `components/effect-policy.ts`, `components/effect-scope.ts` | `resource_source_refinement`, `resource_source_valid`, `resource_source_complete`, `resource_refinement`, `resource_output_valid`, `resource_unknown`, `resource_precision`, `resource_recheck_idempotent`, `resource_pair_sound`, `resource_conflict_exact`, `resource_conflict_complete`, `resource_pair_complete`, `resource_groups_known`, `resource_groups_unshared`, `resource_groups_unknown_complete`, `resource_groups_shared_complete` |
 | Component lifecycle | `policy.ts`: `transitionCurrent`, `cleanupState`, `consume` | `components/supervisor.ts`, `components/effect-scope.ts` | `transition_sound`, `transition_complete`, `cleanup_failure_quarantines`, `consume_once`, `consume_retires` |
 | Capability authority | `authority.ts`: `capabilityAuthority` | `verified/authority.ts`, `core/action-registry.ts` | `authority_issue_exact`, `authority_use_safe`, `authority_use_complete`, `authority_derive_safe`, `authority_derive_complete`, `authority_child_use_safe`, `authority_released_cannot_derive`, `authority_released_not_live`, `authority_released_refused` |
 | Binding lifecycle | `lifecycle.ts`: `bindingStep` | `verified/lifecycle.ts`, `core/provider-bindings.ts`, `core/provider-operations.ts` | 19 step laws: safety, `Open`-based completeness, exact counts, close reservation, quarantine |
@@ -47,7 +47,7 @@ registered module:
 1. Proves each law, step law, k-step law and decision. A claim counts only when
    the verdict is `proven && checked`. `checked` is the kernel's verdict on the
    proof tree that the untrusted prover produced.
-2. Proves each deliberately broken variant (46 of them, such as "a span may
+2. Proves each deliberately broken variant (50 of them, such as "a span may
    straddle the boundary", "stale writes pass", or "derivation checks one
    grant"). Every variant must leave at least one claim unproven. This replaces
    the old negative-mutation script.
@@ -104,8 +104,8 @@ The production path:
    unknown scope (`*`). An unknown source can never become exact
    (`resource_refinement`).
 5. Component lifetime and registry call policy compare complete effect
-   declarations through the compiled `resourceConflict` step, applied to every
-   pair of effects. TypeScript summary maps and flags provide diagnostics only.
+   declarations through the compiled `resourceGroups` step, which decides
+   every pair of effects at once. TypeScript summary maps and flags provide diagnostics only.
    They cannot turn a compiled conflict into an empty conflict list.
 
 A proposer that silently drops resource 65 fails the coverage check. The laws
@@ -128,9 +128,25 @@ exactly the original set. Unknown scopes of ordered effects conflict
 share a name: `resource_conflict_exact` and `resource_pair_complete` cover the
 two directions. So normalization cannot erase a conflict.
 
-The traversal over every pair of effects (`resourceGroups`) is a short
-TypeScript loop around the compiled pairwise decision. It is trusted and
-tested; it is not itself proved.
+Two components' effects are decided over every pair at once by
+`resourceGroups`. Each side is a list of effect flags (`effect`, `ordered`,
+`exact`) and a list of rows (`item`, `name`), one row per name in an exact
+scope, where `item` is the effect's position in its list. A row reads its
+effect at the position it names, so the pairing of a name with its effect is
+the request's data rather than a loop's. The groups conflict unless no ordered
+pair of effects has an unknown scope and no ordered pair of rows names one
+resource. Four laws cover both directions: independent groups have neither kind
+of pair (`resource_groups_known`, `resource_groups_unshared`), and a pair of
+either kind makes them conflict (`resource_groups_unknown_complete`,
+`resource_groups_shared_complete`). The broken variants that pair only the
+diagonal, skip the last left effect, check only the first right effect, or
+check one side against itself are each refused.
+
+The codec stays trusted: it names both sides' rows from one shared table, and
+writes each row's `item` as its effect's position. The rule assumes every row
+names an effect of its own side; the compiled step does not check that
+assumption, so the codec meets it by construction. The rows are quadratic in
+the number of names: two sides of 256 effects with 64 names each take seconds.
 
 ### Multi-step claims
 
@@ -256,8 +272,9 @@ gdp-wired changed these claims:
   coverage are proven over sets of ids, and the codec's injectivity is trusted.
   A resource name's length is the codec's `string.length`.
 - The resource bound counted list entries. It now counts distinct names.
-- Pairwise effect traversal is a trusted loop, as described above. Recheck
-  idempotence and the authority child-use theorem are proven two-step laws.
+- Group conflict over every pair of effects is a proven rule, as described
+  above. Recheck idempotence and the authority child-use theorem are proven
+  two-step laws.
 - Several laws no longer apply. `all_sound` and `all_complete` covered the old
   list conjunction; every predicate is now a direct conjunction with its own
   soundness and completeness laws. `footprint_*` and `close_*` covered

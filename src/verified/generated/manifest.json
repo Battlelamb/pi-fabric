@@ -1,12 +1,12 @@
 {
   "version": 3,
-  "prover": "gdp-wired@0.12.5",
+  "prover": "gdp-wired@0.12.6",
   "inputs": {
     "proofs/index.ts": "d9e2c3f14979dea32bfbd42d2c844ba00ac714e48cbe665d1b9e664e08c60505",
     "proofs/kernel.ts": "c2f7a54f611c859256de1ab0badcb698ee8c8148dc1f2847d683acd1dd71b795",
     "proofs/policy.ts": "47701ff159ea3c1cd142676d93d50346e8542ca6fcf2ccf5f8412a3d5581844a",
     "proofs/compaction.ts": "b559117f9f2224ba7bace8a94fc06af0ff60dd7cd997af5d177990202b4ca9b2",
-    "proofs/resources.ts": "464712aca1ca69cf5d61482b8d98b22888249a9eb5fd441c24712e8227bb3cb5",
+    "proofs/resources.ts": "2253513bbe9cef4a166feb2ff83020d0e36388e2f9ce15911a9ff1e8aabab697",
     "proofs/lifecycle.ts": "e43bc62b44982c55424ba6c36157d89eb4c2545fc445334585ce2379d0a295de",
     "proofs/storage.ts": "5428833c8d71be81947159c8d09fcf31989809da4f09156c7f10cc0291a7df84",
     "proofs/provider.ts": "f067052d8571c79ac9880692aa33a4a794744d3c586db53afd89d466db5659cc",
@@ -14,20 +14,20 @@
     "scripts/verified-kernels.ts": "3a3de6282ff826a4ca527e32248062d8302f8384e34343bf5422d857f7ee1202"
   },
   "outputs": {
-    "src/verified/generated/policy.js": "08795bdb9881ecdc82fe451bdf77747973111754af5d2c8b48cbf5dccc70c9f2",
-    "src/verified/generated/policy.d.ts": "8017c5e035269b7d52ced8562a2a52078bf20347f917308a8045ed560f44a2c3",
-    "src/verified/generated/compaction.js": "6af637160f6164f88059b3334eccff46d446fa00cbe3938cf37085b0a1c97e03",
-    "src/verified/generated/compaction.d.ts": "d0b9a68666b4d21091401158275f3124c405f99ef124cb46538fd54d675f5f7d",
-    "src/verified/generated/resources.js": "d94c6f97d161b413b563c9b17e8cb76cfd3bdc4df883533c813b95ca7d5a0b2c",
-    "src/verified/generated/resources.d.ts": "254c10d77477e0521def0e868682a419682dc45dcc1be475fbf26f13d61694ee",
-    "src/verified/generated/lifecycle.js": "35790cc1575264ca5689be179236e68e2885fd4f6d6115cb6ee703eabe8f2bcf",
-    "src/verified/generated/lifecycle.d.ts": "33a16d3b4785318755a3013ba042b66e40e0f6a2fad611e03af40c709725126d",
-    "src/verified/generated/storage.js": "b97436bdb7df86a2fd3c27ba220a3cfd11abd72d19e052720cd21b5ed8edde1b",
-    "src/verified/generated/storage.d.ts": "ebf781567bcd4bad4efdc6cf2a8213a3a26c8a6054c9cd3e26492c92af6fe1b4",
-    "src/verified/generated/provider.js": "ff96a344bfc4dae08549f5b7012dc5564d74a882c035be24b55291a07cd53188",
-    "src/verified/generated/provider.d.ts": "a53b59e6a262cad4c5339f02da3d1b69fe7acbc96c550ae08897dcf08bad6156",
-    "src/verified/generated/authority.js": "ffa0da96edd7685c2b74ab3de0f0eeea92bff9efb7dab80ae291162360b8e693",
-    "src/verified/generated/authority.d.ts": "47445ab7fec51b9235e0f57daecbcccc5b9a4b12a6070b02ef85ecf5126c7f88"
+    "src/verified/generated/policy.js": "ce234fac27b8c522a012a96e55bca3403c7e533487c8661d9a4ca0ed1f893745",
+    "src/verified/generated/policy.d.ts": "6460f78936eb33c88eb0ee1321bbd24df33d16ffa58ea8e8b9b2cc56499ccc2e",
+    "src/verified/generated/compaction.js": "84e9773b0e9c291cc67519ccfc68e6ea07842e9b7c597fb8e1c6874f6d565a79",
+    "src/verified/generated/compaction.d.ts": "d3b241c14e739b6fc0b15ffb08df3e2b98c3beefb15191ea28bb9ca79484286f",
+    "src/verified/generated/resources.js": "92bfc153f079a8156e30318acfea4a4003351cb2aee1fe0e8dafe9b32e82890a",
+    "src/verified/generated/resources.d.ts": "5a9ae840a48997e3ebf3e8bdd5537b103f72928dcd276718c2cd8c6efa13fd1b",
+    "src/verified/generated/lifecycle.js": "ff267a7f90925161e7b354fe3de24e42730a89c3dc326f933b3db4e8dd545e95",
+    "src/verified/generated/lifecycle.d.ts": "c4cc81c48a05c96e75ab97b2add1183d36574d6f5e8e5bc03ab1fae1e4016300",
+    "src/verified/generated/storage.js": "4a72f474a2aa84c62bd8db5bfe7a887f95a98e692012826819c54922eaf8129c",
+    "src/verified/generated/storage.d.ts": "346b5f7a366bd69756a6f92641cc4650dabb7bf7e0283b65bf37b667303a40c7",
+    "src/verified/generated/provider.js": "52ee8a250e551727dd937c460946807dcfc599d212253e04df0862fc3eac90e4",
+    "src/verified/generated/provider.d.ts": "c93ed5a132a819185602ebcdebf859a85458280541a0f63875820ff45b22fa1e",
+    "src/verified/generated/authority.js": "dc8954218b81ffc434ead73ebfe558304287ff7c7cceddf60c5796a41ac96bfa",
+    "src/verified/generated/authority.d.ts": "3be29fd807d753af9ee28a5770b1227d74dbfca4ec21f074edf2d3a57149917a"
   },
   "claims": {
     "policy": [
@@ -67,7 +67,8 @@
     ],
     "resources": [
       "resourceScope: scope names are a set; resource_source_refinement: an exact source keeps every declared name, and only those; resource_source_valid: an exact source is nonempty, with no empty or wildcard identity; resource_source_complete: every nonempty source of valid identities is exact; resource_refinement: normalization keeps a scope's names in both directions or widens it to unknown; resource_output_valid: an exact normal form is nonempty, at most 64 valid names of at most 256 code units; resource_unknown: a refused scope is unknown and names nothing; resource_precision: a valid bounded set-equivalent proposal is accepted as given (so the identity proposal is unchanged); resource_recheck_idempotent: rechecking a normal form against itself keeps it",
-      "resourceConflict: resource_pair_sound: quiet effects never conflict, nor do two commutative ones; resource_conflict_exact: exact disjoint scopes never conflict; resource_conflict_complete: an ordered pair of effects with an unknown scope conflicts; resource_pair_complete: an ordered pair of effects sharing a named resource conflicts"
+      "resourceConflict: resource_pair_sound: quiet effects never conflict, nor do two commutative ones; resource_conflict_exact: exact disjoint scopes never conflict; resource_conflict_complete: an ordered pair of effects with an unknown scope conflicts; resource_pair_complete: an ordered pair of effects sharing a named resource conflicts",
+      "resourceGroups: resource_groups_known: independent groups have no ordered pair of effects with an unknown scope; resource_groups_unshared: independent groups have no ordered pair of effects naming one resource; resource_groups_unknown_complete: an ordered pair of effects with an unknown scope makes the groups conflict; resource_groups_shared_complete: an ordered pair of effects naming one resource makes the groups conflict"
     ],
     "lifecycle": [
       "bindingStep: inspect_safe: a granted inspection is open to ordinary work and changes nothing; every inspection changes nothing; inspect_open_complete: an inspection open to ordinary work is granted; begin_safe: a granted begin was open and adds exactly one call; a denied one changes nothing; begin_open_complete: every open begin is granted with one more call; retain_safe: a granted retain was open and adds exactly one hold; a denied one changes nothing; retain_open_complete: every open retain is granted with one more hold; close_safe: close starts only from a retiring, ownerless, idle binding, into Closing; otherwise nothing changes; close_complete: a retiring, ownerless, idle binding starts closing; release_exact: a release with holds removes exactly one; with none it is refused and changes nothing; end_exact: an end with calls removes exactly one; with none it is refused and changes nothing; revoke_preserves_work: revocation retires, drops the owner and keeps every hold and call; drop_owner_preserves_work: dropping the owner keeps everything else; retire_preserves_work: retirement changes only the phase; activation_exact: Staged and Active activate; every other phase is refused unchanged; completion_exact: Closing completes into Closed; every other phase is refused unchanged; failure_exact: abort quarantines every unclosed binding, keeping its work; Closed is refused unchanged; closing_refuses_work: a closing binding refuses every begin; revoked_refuses_work: a revoked binding refuses ordinary work; cleanup_after_revocation: a revoked retiring binding still admits cleanup"
