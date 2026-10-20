@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "prover": "gdp-wired@0.12.4",
+  "prover": "gdp-wired@0.12.5",
   "inputs": {
     "proofs/index.ts": "d9e2c3f14979dea32bfbd42d2c844ba00ac714e48cbe665d1b9e664e08c60505",
     "proofs/kernel.ts": "c2f7a54f611c859256de1ab0badcb698ee8c8148dc1f2847d683acd1dd71b795",
@@ -10,24 +10,24 @@
     "proofs/lifecycle.ts": "e43bc62b44982c55424ba6c36157d89eb4c2545fc445334585ce2379d0a295de",
     "proofs/storage.ts": "5428833c8d71be81947159c8d09fcf31989809da4f09156c7f10cc0291a7df84",
     "proofs/provider.ts": "f067052d8571c79ac9880692aa33a4a794744d3c586db53afd89d466db5659cc",
-    "proofs/authority.ts": "b9ee6a4dc95ba3783879423ecf61eaf2256ac62805927ca5b8ba1f390e53cf56",
+    "proofs/authority.ts": "3e4d111396e7b4a5f0798832972a75b945270bb481b77810e253a212684e96fe",
     "scripts/verified-kernels.ts": "3a3de6282ff826a4ca527e32248062d8302f8384e34343bf5422d857f7ee1202"
   },
   "outputs": {
-    "src/verified/generated/policy.js": "189da4db26211036499a40745eae03a5df23ce85d8f14879b7188df896fb03d4",
-    "src/verified/generated/policy.d.ts": "e92b50df4f64d41a6c04f48fabe5dd4e0cf3c3e33239274bbbdd59b8af71400d",
-    "src/verified/generated/compaction.js": "e251c1580c770724fbe9f24d1e564ce9502268a96961e20451eed388e8773787",
-    "src/verified/generated/compaction.d.ts": "8c7607e984a553f83e4bb04fbea9e0442b86ab146c0c6194f44b3c8a24d166bd",
-    "src/verified/generated/resources.js": "5711a8099823de184562ec4a9d173738da55444ab0c0c724ff7e020988bab9bc",
-    "src/verified/generated/resources.d.ts": "918629e843835add43ae3011f39433fdedd73d55d15effe75f23a5c1f310bc18",
-    "src/verified/generated/lifecycle.js": "735f88bd1065b369cc32521b8d41e00150af469d10ab29e707b0b996c73a7bb0",
-    "src/verified/generated/lifecycle.d.ts": "cdd7e8668c850c4e38be9fd0a3c8ffe0f6fd0b106baa5f8b47f72cead0eea6c0",
-    "src/verified/generated/storage.js": "8f446b60c6ca609a54b77106d460a4dd8652356ed886f069ffccbf577e535c22",
-    "src/verified/generated/storage.d.ts": "7030b3c6934dde35eebdb7b0e6aceb1a29e177cfb257ce40c41f5732be3b052b",
-    "src/verified/generated/provider.js": "ae6d5cbf2e5a3db8b378ca4162b273aac13bede70ebc5d33b0fced0000142c74",
-    "src/verified/generated/provider.d.ts": "8fbc07f9df59cc38259e657032931d3797409b59efc093b5183d0cbc16f98aee",
-    "src/verified/generated/authority.js": "bff46eeddd29e182aa27c94abd8f0141b797da17e4e7389ddeb9149f17c9f52e",
-    "src/verified/generated/authority.d.ts": "2cb0a4c80c6290f7bbfbdd4468f8a3b05631e8b3e80802a8d5d00c59ae70ff44"
+    "src/verified/generated/policy.js": "08795bdb9881ecdc82fe451bdf77747973111754af5d2c8b48cbf5dccc70c9f2",
+    "src/verified/generated/policy.d.ts": "8017c5e035269b7d52ced8562a2a52078bf20347f917308a8045ed560f44a2c3",
+    "src/verified/generated/compaction.js": "6af637160f6164f88059b3334eccff46d446fa00cbe3938cf37085b0a1c97e03",
+    "src/verified/generated/compaction.d.ts": "d0b9a68666b4d21091401158275f3124c405f99ef124cb46538fd54d675f5f7d",
+    "src/verified/generated/resources.js": "d94c6f97d161b413b563c9b17e8cb76cfd3bdc4df883533c813b95ca7d5a0b2c",
+    "src/verified/generated/resources.d.ts": "254c10d77477e0521def0e868682a419682dc45dcc1be475fbf26f13d61694ee",
+    "src/verified/generated/lifecycle.js": "35790cc1575264ca5689be179236e68e2885fd4f6d6115cb6ee703eabe8f2bcf",
+    "src/verified/generated/lifecycle.d.ts": "33a16d3b4785318755a3013ba042b66e40e0f6a2fad611e03af40c709725126d",
+    "src/verified/generated/storage.js": "b97436bdb7df86a2fd3c27ba220a3cfd11abd72d19e052720cd21b5ed8edde1b",
+    "src/verified/generated/storage.d.ts": "ebf781567bcd4bad4efdc6cf2a8213a3a26c8a6054c9cd3e26492c92af6fe1b4",
+    "src/verified/generated/provider.js": "ff96a344bfc4dae08549f5b7012dc5564d74a882c035be24b55291a07cd53188",
+    "src/verified/generated/provider.d.ts": "a53b59e6a262cad4c5339f02da3d1b69fe7acbc96c550ae08897dcf08bad6156",
+    "src/verified/generated/authority.js": "ffa0da96edd7685c2b74ab3de0f0eeea92bff9efb7dab80ae291162360b8e693",
+    "src/verified/generated/authority.d.ts": "47445ab7fec51b9235e0f57daecbcccc5b9a4b12a6070b02ef85ecf5126c7f88"
   },
   "claims": {
     "policy": [
@@ -87,7 +87,7 @@
       "providerTicket: provider_plan_safe: a planned write had a live grant for this key, no cancellation and the expected revision, and forwards them exactly; provider_ticket_consumed: taking consumes the ticket and keeps its contents; provider_revocation_consumes: revoking consumes the ticket and plans nothing; provider_revoked_refused: a consumed ticket plans nothing; provider_canceled_refused: a canceled take plans nothing; state_stale_refused: a revision other than the expected one plans nothing; provider_admission_complete: a live ticket taken for its key at its revision plans exactly its write; provider_replay_refused: a second take of the same ticket plans nothing"
     ],
     "authority": [
-      "capabilityAuthority: grants are a set; authority_issue_exact: issuance is live and holds exactly its grants; authority_use_safe: a granted use was live and named a held grant; authority_use_complete: a live use of a held grant is granted; authority_use_preserves: a use changes no authority; authority_derive_safe: a live child had a live parent and holds exactly its candidate, all within the parent; authority_derive_complete: a candidate within a live parent is derived exactly; authority_released_cannot_derive: a released parent derives only a released child; authority_released_not_live: release leaves no live authority and no grants; authority_released_refused: a released authority grants nothing"
+      "capabilityAuthority: grants are a set; authority_issue_exact: issuance is live and holds exactly its grants; authority_use_safe: a granted use was live and named a held grant; authority_use_complete: a live use of a held grant is granted; authority_use_preserves: a use changes no authority; authority_derive_safe: a live child had a live parent and holds exactly its candidate, all within the parent; authority_derive_complete: a candidate within a live parent is derived exactly; authority_released_cannot_derive: a released parent derives only a released child; authority_released_not_live: release leaves no live authority and no grants; authority_child_use_safe: a derived child's granted use names a grant of its parent; authority_released_refused: a released authority grants nothing"
     ]
   }
 }

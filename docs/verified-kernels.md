@@ -24,7 +24,7 @@ a set of small policy kernels, **not a proof of every subsystem invariant**.
 | --- | --- | --- | --- |
 | Effect independence | `resources.ts`: `resourceScope`, `resourceConflict` | `verified/resources.ts`, `components/effect-policy.ts`, `components/effect-scope.ts` | `resource_source_refinement`, `resource_source_valid`, `resource_source_complete`, `resource_refinement`, `resource_output_valid`, `resource_unknown`, `resource_precision`, `resource_recheck_idempotent`, `resource_pair_sound`, `resource_conflict_exact`, `resource_conflict_complete`, `resource_pair_complete` |
 | Component lifecycle | `policy.ts`: `transitionCurrent`, `cleanupState`, `consume` | `components/supervisor.ts`, `components/effect-scope.ts` | `transition_sound`, `transition_complete`, `cleanup_failure_quarantines`, `consume_once`, `consume_retires` |
-| Capability authority | `authority.ts`: `capabilityAuthority` | `verified/authority.ts`, `core/action-registry.ts` | `authority_issue_exact`, `authority_use_safe`, `authority_use_complete`, `authority_derive_safe`, `authority_derive_complete`, `authority_released_cannot_derive`, `authority_released_not_live`, `authority_released_refused` |
+| Capability authority | `authority.ts`: `capabilityAuthority` | `verified/authority.ts`, `core/action-registry.ts` | `authority_issue_exact`, `authority_use_safe`, `authority_use_complete`, `authority_derive_safe`, `authority_derive_complete`, `authority_child_use_safe`, `authority_released_cannot_derive`, `authority_released_not_live`, `authority_released_refused` |
 | Binding lifecycle | `lifecycle.ts`: `bindingStep` | `verified/lifecycle.ts`, `core/provider-bindings.ts`, `core/provider-operations.ts` | 19 step laws: safety, `Open`-based completeness, exact counts, close reservation, quarantine |
 | Compaction | `compaction.ts`: `compactionCut`; `policy.ts`: `summaryWithin`, `sampleWithin` | `compaction/hook.ts`, `compaction/bounds.ts` | `cut_sound`, `span_sound`, `refusal_final`, `header_once`, `cut_complete`, `summary_bounds`, `summary_complete`, `sample_accounting`, `sample_complete` |
 | Memory | `policy.ts`: `lineageSelected`, `pointerCurrent`, `chunkAccepted`, `coverageComplete` | `memory/normalize.ts`, `memory/expand-service.ts`, `memory/digest.ts`, `memory/index.ts` | `active_lineage_only`, `explicit_all_lineages`, `pointer_sound`, `pointer_complete`, `chunk_sound`, `chunk_complete`, `coverage_sound`, `coverage_complete` |
@@ -132,12 +132,10 @@ The traversal over every pair of effects (`resourceGroups`) is a short
 TypeScript loop around the compiled pairwise decision. It is trusted and
 tested; it is not itself proved.
 
-### Other compositions
+### Multi-step claims
 
-- `authority_child_use_safe` composes `authority_derive_safe` (a live child's
-  grants are within its parent's) with `authority_use_safe` (a granted use
-  names a held grant). The two-step form exceeds what the prover instantiates
-  today, so the claim is stated as this composition, at full strength.
+- `authority_child_use_safe` is a proven two-step law on the child's machine:
+  after a derive, a granted use names a grant of the parent the derive read.
 - The compaction cut is checked as a fold: one header step, then one step per
   call/result span. `cut_sound` is an invariant over every run. `span_sound`
   shows that a span keeps the cut open only if the cut was open and the span is
@@ -258,9 +256,8 @@ gdp-wired changed these claims:
   coverage are proven over sets of ids, and the codec's injectivity is trusted.
   A resource name's length is the codec's `string.length`.
 - The resource bound counted list entries. It now counts distinct names.
-- Pairwise effect traversal and the authority child-use theorem are
-  compositions, as described above. Recheck idempotence is a proven two-step
-  law.
+- Pairwise effect traversal is a trusted loop, as described above. Recheck
+  idempotence and the authority child-use theorem are proven two-step laws.
 - Several laws no longer apply. `all_sound` and `all_complete` covered the old
   list conjunction; every predicate is now a direct conjunction with its own
   soundness and completeness laws. `footprint_*` and `close_*` covered
