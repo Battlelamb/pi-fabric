@@ -177,10 +177,21 @@ import { captureLoadedFileIdentity, type FabricLoadedFileIdentity } from "./buil
 // captured at activation is the ground truth a reload-freshness check compares
 // the current disk file against.
 const FABRIC_RUNTIME_MODULE_IDENTITY = captureLoadedFileIdentity(import.meta.url);
-/** Longest shutdown waits for Fabric to remove its label from Herdr names. */
-const SESSION_LABEL_CLOSE_TIMEOUT_MS = 2_000;
-/** Longest shutdown waits for Fabric to clear its agent status from Herdr. */
-const HERDR_STATUS_CLOSE_TIMEOUT_MS = 2_000;
+/** Longest shutdown waits for Fabric to clear its label and agent status from Herdr. */
+const HERDR_CLOSE_TIMEOUT_MS = 2_000;
+
+/** Wait for a Herdr cleanup, bounded so a stuck socket cannot hold up shutdown. */
+const closeWithinTimeout = async (closing: Promise<void>): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    closing.catch(() => undefined),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, HERDR_CLOSE_TIMEOUT_MS);
+      timer.unref?.();
+    }),
+  ]);
+  clearTimeout(timer);
+};
 
 /** An interactive root session in a Herdr pane, where Herdr shows its state. */
 const herdrStatusAvailable = (context: ExtensionContext): boolean =>
@@ -385,22 +396,19 @@ export class FabricRuntimeState {
     this.#herdrStatusLoad = load;
   }
 
-  /** Release Herdr holds and clear the pane metadata, bounded so shutdown never hangs. */
-  async #closeHerdrStatus(): Promise<void> {
+  /**
+   * Release Herdr holds and clear the pane metadata, and remove the label from
+   * the footer and Herdr names. Both run at once under one bound.
+   */
+  async #closeHerdr(): Promise<void> {
     this.#herdrStatusWanted = false;
     this.#herdrStatusLoad = undefined;
     const status = this.#herdrStatus;
+    const label = this.#sessionLabel;
     this.#herdrStatus = undefined;
-    if (!status) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      status.close(),
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, HERDR_STATUS_CLOSE_TIMEOUT_MS);
-        timer.unref?.();
-      }),
-    ]);
-    clearTimeout(timer);
+    this.#sessionLabel = undefined;
+    if (!status && !label) return;
+    await closeWithinTimeout(Promise.all([status?.close(), label?.close()]).then(() => undefined));
   }
 
   /** The project decision store, or undefined when the mesh is disabled. */
@@ -1570,12 +1578,11 @@ export class FabricRuntimeState {
   }
 
   async shutdown(): Promise<void> {
-    await this.#closeHerdrStatus();
+    await this.#closeHerdr();
     this.#completionInbox?.close();
     this.#completionInbox = undefined;
     this.#peerPresence?.close();
     this.#peerPresence = undefined;
-    await this.#closeSessionLabel();
     this.#shellInbox?.close();
     this.#shellInbox = undefined;
     this.#shellTiming?.close();
@@ -1699,34 +1706,14 @@ export class FabricRuntimeState {
     await repairs?.flush();
   }
 
-  /**
-   * Remove the label from the footer and Herdr names. Herdr gets a short
-   * bound so a stuck socket cannot hold up shutdown.
-   */
-  async #closeSessionLabel(): Promise<void> {
-    const presenter = this.#sessionLabel;
-    this.#sessionLabel = undefined;
-    if (!presenter) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      presenter.close().catch(() => undefined),
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, SESSION_LABEL_CLOSE_TIMEOUT_MS);
-        timer.unref?.();
-      }),
-    ]);
-    if (timer) clearTimeout(timer);
-  }
-
   async #closeInternal(): Promise<void> {
     this.#completionInbox?.close();
     this.#completionInbox = undefined;
-    await this.#closeSessionLabel();
+    await this.#closeHerdr();
     this.#shellInbox?.close();
     this.#shellInbox = undefined;
     this.#shellTiming?.close();
     this.#shellTiming = undefined;
-    await this.#closeHerdrStatus();
     await this.shellJobs.close();
     await this.#deactivateRepairs();
     if (!this.#registry) return;
