@@ -362,19 +362,27 @@ describe("agent manager spawning primitives", () => {
       .toEqual(["read"]);
     expect(await launchedTools({ childQuestions: "route" }, { tools: ["read"], extensions: false }))
       .toEqual(["read"]);
+    // An explicit empty list means no tools, and Pi refuses a plain name
+    // mixed into a +name/-name list.
+    expect(await launchedTools({ childQuestions: "route" }, { tools: [] })).toEqual([]);
+    expect(await launchedTools({ childQuestions: "route" }, { tools: ["+grep", "-write"] }))
+      .toEqual(["+grep", "-write"]);
   });
 
   it("never widens an inherited tool allowlist with the question tool", async () => {
     const cwd = tempRoot("pi-fabric-question-tool-nested-");
-    const launchedTools = async (): Promise<string[]> => {
+    const launchedTools = async (tools = ["read"]): Promise<string[]> => {
       const { manager, runRoot } = createManager(cwd, {}, { childQuestions: "route" });
-      const result = await manager.run({ task: "x", transport: "process", tools: ["read"] });
+      const result = await manager.run({ task: "x", transport: "process", tools });
       return JSON.parse(launchArgs(runRoot, result.id).tools!) as string[];
     };
     vi.stubEnv("PI_FABRIC_TOOL_ALLOWLIST", JSON.stringify(["read"]));
     expect(await launchedTools()).toEqual(["read"]);
     vi.stubEnv("PI_FABRIC_TOOL_ALLOWLIST", JSON.stringify(["read", "ask"]));
     expect(await launchedTools()).toEqual(["read", "ask"]);
+    // The inherited filter drops the -ask modifier; the caller's exclusion
+    // still holds.
+    expect(await launchedTools(["-ask"])).not.toContain("ask");
   });
 
   it("inherits lineage roots and the caller policy in nested managers", async () => {

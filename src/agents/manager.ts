@@ -2437,7 +2437,8 @@ export class AgentManager {
   readonly #inheritedToolAllowlist = readChildToolAllowlist();
 
   #childTools(request: AgentRunRequest, runner: FabricRunnerAdapter, requiresFabricKernel = false): string[] {
-    const tools = [...(request.tools ?? this.config.defaultTools)].filter(
+    const requested = request.tools ?? this.config.defaultTools;
+    const tools = requested.filter(
       (tool) => tool !== "fabric_exec" &&
         (this.#inheritedToolAllowlist === undefined || this.#inheritedToolAllowlist.has(tool)),
     );
@@ -2445,15 +2446,17 @@ export class AgentManager {
       ? true
       : (request.extensions ?? this.config.extensions);
     // agents.childQuestions "route" sends a child's dialogs to the parent, so a
-    // Pi child with extensions also gets the tool that opens them. A Pi tool
-    // list of +name/-name modifiers cannot take a plain name, and an inherited
-    // allowlist is never widened.
+    // Pi child with extensions also gets the tool that opens them. An empty
+    // list asks for no tools, a Pi tool list of +name/-name modifiers cannot
+    // take a plain name, and an inherited allowlist is never widened. Read the
+    // request, not the filtered list: the filter can drop a -name modifier.
     if (
       this.config.childQuestions === "route" &&
       (runner.id === "pi" || runner.id === "pi-durable") &&
       runner.capabilities.questions &&
       extensions &&
-      !tools.some((tool) => tool.startsWith("+") || tool.startsWith("-"))
+      requested.length > 0 &&
+      !requested.some((tool) => tool.startsWith("+") || tool.startsWith("-"))
     ) {
       for (const tool of this.config.childQuestionTools ?? ["ask"]) {
         if (this.#inheritedToolAllowlist === undefined || this.#inheritedToolAllowlist.has(tool)) tools.push(tool);
