@@ -172,6 +172,18 @@ describe.skipIf(process.platform === "win32")("durable shell tasks through jev-f
     await registry.close();
   });
 
+  it("creates no default store for a Jev resolution", async () => {
+    const env = environment();
+    vi.stubEnv("JEV_FABRIC_HOME", undefined);
+    const bridge = new DurableShellBridge(new FabricShellJobStore(), {
+      cwd: env.root, agentDir: env.agentDir, ownerId: "jev-only",
+      settings: () => ({ binary: env.binary, home: "", timeoutMs: 60_000 }),
+      middleware: () => undefined,
+    });
+    await bridge.resolve("jev").catch(() => undefined);
+    expect(fs.existsSync(path.join(env.root, ".jev-fabric-native"))).toBe(false);
+  });
+
   it("leaves an explicitly configured store untouched", async () => {
     const env = environment();
     const { store, tasks, bash } = session(env);

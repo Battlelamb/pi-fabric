@@ -68,7 +68,7 @@ export const resolveJevFabricHome = (settings: DurableShellSettings, cwd: string
  * it a `*` .gitignore before jev-fabric creates anything, so job folders and
  * stop markers never show as untracked files. A configured home is left alone.
  */
-export const ignoreDefaultJevFabricHome = (settings: DurableShellSettings, cwd: string): void => {
+const ignoreDefaultJevFabricHome =(settings: DurableShellSettings, cwd: string): void => {
   if (settings.home || process.env.JEV_FABRIC_HOME) return;
   const home = resolveJevFabricHome(settings, cwd);
   try {
@@ -109,8 +109,6 @@ export class DurableShellBridge {
    */
   resolve(requirement: JevFabricRequirement): Promise<JevFabricResolution> {
     DurableShellBridge.assertSupported();
-    // Every store use (CLI, sessions serve, Jev serve) resolves first.
-    ignoreDefaultJevFabricHome(this.options.settings(), this.options.cwd);
     const configured = this.options.settings().binary;
     const key = `${configured}\0${requirement}`;
     let pending = this.#resolutions.get(key);
@@ -121,7 +119,13 @@ export class DurableShellBridge {
       pending.catch(() => this.#resolutions.delete(key));
       this.#resolutions.set(key, pending);
     }
-    return pending;
+    // Durable jobs and sessions resolve before they create the store; Jev decisions
+    // never write it, and a failed resolution leaves the working directory alone.
+    if (requirement !== "durable" && requirement !== "sessions") return pending;
+    return pending.then(resolution => {
+      ignoreDefaultJevFabricHome(this.options.settings(), this.options.cwd);
+      return resolution;
+    });
   }
 
   async #cli(): Promise<JevFabricCli> {
