@@ -166,7 +166,6 @@ describe.skipIf(process.platform === "win32")("session label in Herdr", () => {
     expect(herdr.renames()).toEqual([
       { method: "tab.rename", params: { tab_id: "w1:t1", label: "FAB-3 fabric-in-pi" } },
     ]);
-    expect(presenter.status().herdr.applied).toEqual(["tab w1:t1"]);
 
     await presenter.close();
     expect(herdr.tab.label).toBe("fabric-in-pi");
@@ -230,7 +229,6 @@ describe.skipIf(process.platform === "win32")("session label in Herdr", () => {
 
     expect(herdr.pane.label).toBeNull();
     expect(herdr.tab.label).toBe("fabric-in-pi");
-    expect(presenter.status().herdr.applied).toEqual([]);
   });
 
   it("does not rename anything outside an interactive TUI or outside Herdr", async () => {
@@ -244,10 +242,9 @@ describe.skipIf(process.platform === "win32")("session label in Herdr", () => {
     await notHerdr.presenter.sync();
 
     expect(herdr.requests).toEqual([]);
-    expect(notHerdr.presenter.status().herdr.available).toBe(false);
   });
 
-  it("reports a Herdr failure in status instead of throwing", async () => {
+  it("survives a Herdr failure without throwing", async () => {
     const herdr = await startHerdr({ failRename: true });
     const current = settings({ herdr: "tab" });
     const { presenter } = present({ settings: () => current, environment: herdr.environment });
@@ -255,7 +252,6 @@ describe.skipIf(process.platform === "win32")("session label in Herdr", () => {
     await expect(presenter.sync()).resolves.toBeUndefined();
 
     expect(herdr.tab.label).toBe("fabric-in-pi");
-    expect(presenter.status().herdr.error).toContain("rename refused");
   });
 
   it("reapplies after a session name change without waiting for the timer", async () => {

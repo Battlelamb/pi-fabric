@@ -137,7 +137,7 @@ import {
 import { AgentManager } from "./agents/manager.js";
 import { AgentCompletionInbox } from "./agents/completion-inbox.js";
 import { PeerPresenceNotifier } from "./topology/peer-presence.js";
-import { SessionLabelPresenter, type SessionLabelControl } from "./topology/session-label.js";
+import { SessionLabelPresenter } from "./topology/session-label.js";
 import { sessionLabelSettings } from "./topology/session-label-settings.js";
 import { ShellEventInbox } from "./core/shell-inbox.js";
 import { FabricShellTimingBridge } from "./core/shell-timing.js";
@@ -339,11 +339,6 @@ export class FabricRuntimeState {
 
   peerInfos(): FabricPeerInfo[] {
     return this.#participants?.peers() ?? [];
-  }
-
-  /** This session's Fabric label, for `/fabric label`; undefined in a child. */
-  sessionLabel(): SessionLabelControl | undefined {
-    return this.#sessionLabel;
   }
 
   /** The project decision store, or undefined when the mesh is disabled. */

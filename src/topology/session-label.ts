@@ -19,26 +19,6 @@ interface AppliedName {
   position: FabricSessionLabelConfig["herdrPosition"];
 }
 
-/** What `/fabric label` reports. */
-export interface SessionLabelStatus {
-  label?: string;
-  footer: boolean;
-  herdr: {
-    available: boolean;
-    target: FabricSessionLabelHerdrTarget;
-    position: FabricSessionLabelConfig["herdrPosition"];
-    applied: string[];
-    error?: string;
-  };
-}
-
-/** What `/fabric label` needs from a root session's presenter. */
-export interface SessionLabelControl {
-  status(): SessionLabelStatus;
-  /** Apply changed settings now instead of on the next timer tick. */
-  sync(): Promise<void>;
-}
-
 export interface SessionLabelPresenterOptions {
   /** The minted peer label, once the participant directory has one. */
   label: () => string | undefined;
@@ -92,7 +72,6 @@ export class SessionLabelPresenter {
   #footer: string | undefined;
   #syncing: Promise<void> | undefined;
   #syncAgain = false;
-  #error: string | undefined;
   #closed = false;
 
   constructor(
@@ -123,23 +102,10 @@ export class SessionLabelPresenter {
       && Boolean(this.#environment.HERDR_PANE_ID);
   }
 
-  status(): SessionLabelStatus {
-    const settings = this.options.settings();
-    const label = this.options.label();
-    return {
-      ...(label ? { label } : {}),
-      footer: settings.footer,
-      herdr: {
-        available: this.herdrAvailable,
-        target: settings.herdr,
-        position: settings.herdrPosition,
-        applied: [...this.#applied.values()].map((name) => `${name.kind} ${name.id}`),
-        ...(this.#error ? { error: this.#error } : {}),
-      },
-    };
-  }
-
-  /** Bring the footer and Herdr names in line with the label and settings. Never throws. */
+  /**
+   * Bring the footer and Herdr names in line with the label and settings.
+   * Never throws: a failed Herdr request is retried on the next sync.
+   */
   sync(): Promise<void> {
     if (this.#closed) return Promise.resolve();
     if (this.#syncing) {
@@ -195,7 +161,6 @@ export class SessionLabelPresenter {
     this.#setFooter(settings.footer && label ? `Fabric ${label}` : undefined);
     const wanted = new Set<HerdrName>(label && this.herdrAvailable ? targets(settings.herdr) : []);
     try {
-      this.#error = undefined;
       for (const [key, name] of [...this.#applied]) {
         if (!wanted.has(name.kind) || name.label !== label || name.position !== settings.herdrPosition) {
           await this.#remove(name);
@@ -204,8 +169,8 @@ export class SessionLabelPresenter {
       }
       if (!label) return;
       for (const kind of wanted) await this.#apply(kind, label, settings.herdrPosition);
-    } catch (error) {
-      this.#error = error instanceof Error ? error.message : String(error);
+    } catch {
+      // Herdr is unreachable or refused; the next sync reads the live names again.
     }
   }
 
@@ -242,8 +207,8 @@ export class SessionLabelPresenter {
       if (!current) return;
       const base = stripAffix(current.label, name.label);
       if (base !== current.label) await this.#rename(name.kind, name.id, base);
-    } catch (error) {
-      this.#error = error instanceof Error ? error.message : String(error);
+    } catch {
+      // Best effort: shutdown and opt-out must not fail on Herdr.
     }
   }
 

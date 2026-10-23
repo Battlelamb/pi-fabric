@@ -186,9 +186,7 @@ export function registerFabricCommand(pi: ExtensionAPI, deps: FabricCommandDeps)
 
   pi.registerCommand("fabric", {
     description: "Open Fabric dashboard, chat or tasks, arm prewalk, reload, or manage agents and actors",
-    getArgumentCompletions: (
-      argumentPrefix: string,
-    ): AutocompleteItem[] | null | Promise<AutocompleteItem[] | null> => {
+    getArgumentCompletions: (argumentPrefix: string): AutocompleteItem[] | null => {
       const subcommands = [
         "status",
         "dashboard",
@@ -219,7 +217,6 @@ export function registerFabricCommand(pi: ExtensionAPI, deps: FabricCommandDeps)
         "decisions",
         "programs",
         "run",
-        "label",
       ];
       const idCommands = new Set([
         "messages",
@@ -239,9 +236,6 @@ export function registerFabricCommand(pi: ExtensionAPI, deps: FabricCommandDeps)
       }
       const subcommand = argumentPrefix.slice(0, firstSpace);
       const idPrefix = argumentPrefix.slice(firstSpace + 1);
-      if (subcommand === "label") {
-        return import("./session-label-command.js").then((module) => module.sessionLabelCompletions(idPrefix));
-      }
       if (!state.initialized) return null;
       if (subcommand === "tasks") {
         const matches = state.shellJobs?.list().filter(job => job.id.startsWith(idPrefix)) ?? [];

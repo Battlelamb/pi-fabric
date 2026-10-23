@@ -718,7 +718,7 @@ See the [TypeScript MCP reference](../skillsets/typescript/fabric-exec/reference
   - `footer` defaults to `true` and shows `Fabric FAB-3` in the Pi footer.
   - `herdr` is `"off"` (default), `"tab"`, `"pane"`, or `"both"`. When Pi runs interactively inside Herdr, Fabric adds the label to that tab or pane name. It reads the live name before each change, so a rename by Herdr, by you, or by Pi's own name sync keeps its new text, and Fabric adds its label back within a few seconds. On shutdown, or when you turn the setting off, Fabric removes only its own label word. A pane with no name of its own goes back to having none.
   - `herdrPosition` is `"prefix"` (default) or `"suffix"`: whether the label goes before or after the existing name.
-  - Labels exist only while `mesh.enabled` is `true`. Change these settings with `/fabric label` or under `/fabric settings` → **UI**.
+  - Labels exist only while `mesh.enabled` is `true`. Change these settings under `/fabric settings` → **UI**; a change applies at once.
 - The widget renders above the chat, like `pi-supervisor`. Set `ui.enabled` to `false` to disable both the widget and the dashboard controller.
 
 See the [interface reference](interface.md).

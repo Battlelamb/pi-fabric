@@ -1,5 +1,5 @@
 // `ui.sessionLabel` is checked here, where it is used, rather than in
-// normalizeFabricConfig: the presenter, `/fabric label` and the settings UI all
+// normalizeFabricConfig: the presenter and the settings UI both
 // load at first use, so the check stays out of the startup graph.
 
 export const SESSION_LABEL_HERDR_TARGETS = ["off", "tab", "pane", "both"] as const;
