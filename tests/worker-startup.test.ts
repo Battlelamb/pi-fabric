@@ -51,6 +51,35 @@ describe("worker bootstrap diagnostics", () => {
     expect(explainMissingInstall(relative, entry)).toBe(relative);
     const other = Object.assign(new Error("Cannot find package 'diff'"), { code: "EACCES" });
     expect(explainMissingInstall(other, entry)).toBe(other);
+    const required = (importer?: string) => Object.assign(new Error(`Cannot find module 'which'\nRequire stack:\n- ${importer}`),
+      { code: "MODULE_NOT_FOUND", ...(importer ? { requireStack: [importer] } : {}) });
+    expect((explainMissingInstall(required(path.join(root, "node_modules/cross-spawn/index.js")), entry) as Error).message)
+      .toContain(`its dependency "which" is not installed`);
+    const foreignRequire = required(path.join(path.dirname(root), "other-extension", "index.cjs"));
+    expect(explainMissingInstall(foreignRequire, entry)).toBe(foreignRequire);
+    const unknown = required();
+    expect(explainMissingInstall(unknown, entry)).toBe(unknown);
+  });
+
+  it("finds an importer path with spaces and names the remedy for each install kind", () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), "worker install "));
+    roots.push(parent);
+    const missing = (root: string) => Object.assign(
+      new Error(`Cannot find package 'cross-spawn' imported from ${path.join(root, "dist/worker.js")}`), { code: "ERR_MODULE_NOT_FOUND" });
+    const checkout = path.join(parent, "pi fabric");
+    fs.mkdirSync(path.join(checkout, "dist"), { recursive: true });
+    fs.writeFileSync(path.join(checkout, "package.json"), "{}");
+    const local = (explainMissingInstall(missing(checkout), pathToFileURL(path.join(checkout, "dist/worker.js")).href) as Error).message;
+    expect(local).toContain(`Fabric build at ${checkout} cannot start a worker`);
+    expect(local).toContain("(the build has no node_modules)");
+    expect(local).toContain("Run `bun install` in that directory");
+    const managed = path.join(parent, "node_modules", "pi-fabric");
+    fs.mkdirSync(path.join(managed, "dist"), { recursive: true });
+    fs.writeFileSync(path.join(managed, "package.json"), "{}");
+    const installed = (explainMissingInstall(missing(managed), pathToFileURL(path.join(managed, "dist/worker.js")).href) as Error).message;
+    expect(installed).toContain(`Fabric build at ${managed} cannot start a worker`);
+    expect(installed).not.toContain("has no node_modules");
+    expect(installed).toContain("`pi install npm:pi-fabric`");
   });
 
   it("does not invent a destination when no status path is available", () => {

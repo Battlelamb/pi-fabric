@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MISSING_PACKAGE = /Cannot find (?:package|module) '([^']+)'/;
-const IMPORTED_FROM = / imported from (\S+)/;
+const IMPORTED_FROM = / imported from (.+)$/m;
 
 /** The package name of a bare specifier, or undefined for a path or URL. */
 const packageName = (specifier: string): string | undefined => {
@@ -40,15 +40,23 @@ export const explainMissingInstall = (error: unknown, entryUrl: string): unknown
   try { root = buildRoot(entryUrl); } catch { return error; }
   if (!root) return error;
   // Only the build's own imports: a package missing for some other importer is not this build's install.
-  const importer = IMPORTED_FROM.exec(message)?.[1];
-  if (importer) {
-    const relative = path.relative(root, importer.startsWith("file:") ? fileURLToPath(importer) : importer);
-    if (relative.startsWith("..") || path.isAbsolute(relative)) return error;
-  }
-  const noModules = !fs.existsSync(path.join(root, "node_modules"));
+  // ESM names the importer in the message, CommonJS in requireStack; an unknown origin is left alone.
+  const requireStack = (error as { requireStack?: unknown }).requireStack;
+  const importer = IMPORTED_FROM.exec(message)?.[1]
+    ?? (Array.isArray(requireStack) && typeof requireStack[0] === "string" ? requireStack[0] : undefined);
+  if (!importer) return error;
+  let relative: string;
+  try { relative = path.relative(root, importer.startsWith("file:") ? fileURLToPath(importer) : importer); } catch { return error; }
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return error;
+  // A managed (npm) install hoists dependencies beside the package; only a checkout's own node_modules is telling.
+  const managed = root.split(/[\\/]/).includes("node_modules");
+  const noModules = !managed && !fs.existsSync(path.join(root, "node_modules"));
+  const remedy = managed
+    ? "Reinstall it with `pi install npm:pi-fabric`, or restart Pi if an update replaced it during this session."
+    : "Run `bun install` in that directory, or restart Pi so it loads an installed build.";
   return new Error(
     `Fabric build at ${root} cannot start a worker: its dependency "${name}" is not installed${noModules ? " (the build has no node_modules)" : ""}. ` +
-    `Workers run from the build this Pi session started with. Reinstall that build's dependencies, or restart Pi so it loads an installed build. ` +
+    `Workers run from the build this Pi session started with. ${remedy} ` +
     `Cause: ${message.split("\n")[0]}`,
     { cause: error },
   );
