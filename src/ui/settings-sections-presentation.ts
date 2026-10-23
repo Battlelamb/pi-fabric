@@ -27,7 +27,6 @@ import {
 } from "./settings-values.js";
 import {
   SESSION_LABEL_HERDR_TARGETS,
-  SESSION_LABEL_POSITIONS,
   sessionLabelSettings,
 } from "../topology/session-label-settings.js";
 
@@ -146,18 +145,9 @@ export const buildUiSection = (
         ),
         setting("ui.sessionLabel.herdr", "Session label in Herdr", sessionLabel.herdr, {
           description:
-            "Add this session's Fabric peer label to the Herdr tab, the pane, both, or neither. Applies only when Pi runs inside Herdr.",
+            "Put this session's Fabric peer label before the Herdr tab name, the pane name, both, or neither. Applies only when Pi runs inside Herdr.",
           values: SESSION_LABEL_HERDR_TARGETS,
         }),
-        setting(
-          "ui.sessionLabel.herdrPosition",
-          "Herdr label position",
-          sessionLabel.herdrPosition,
-          {
-            description: "Put the Fabric label before (prefix) or after (suffix) the existing Herdr name.",
-            values: SESSION_LABEL_POSITIONS,
-          },
-        ),
         setting("ui.maxRows", "Max rows", String(config.ui.maxRows), {
           description: "Maximum rows rendered by the activity widget.",
           submenu: numericSubmenu(

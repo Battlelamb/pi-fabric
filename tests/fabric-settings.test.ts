@@ -78,8 +78,6 @@ describe("FabricSettingsComponent", () => {
     expect(row("ui.sessionLabel.footer")?.values).toEqual(["true", "false"]);
     expect(row("ui.sessionLabel.herdr")?.currentValue).toBe("off");
     expect(row("ui.sessionLabel.herdr")?.values).toEqual(["off", "tab", "pane", "both"]);
-    expect(row("ui.sessionLabel.herdrPosition")?.currentValue).toBe("prefix");
-    expect(row("ui.sessionLabel.herdrPosition")?.values).toEqual(["prefix", "suffix"]);
     expect(buildPartial("ui.sessionLabel.footer", coerceValue("ui.sessionLabel.footer", "false", DEFAULT_FABRIC_CONFIG)))
       .toEqual({ ui: { sessionLabel: { footer: false } } });
     expect(buildPartial("ui.sessionLabel.herdr", coerceValue("ui.sessionLabel.herdr", "pane", DEFAULT_FABRIC_CONFIG)))

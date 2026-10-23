@@ -81,7 +81,6 @@ const startHerdr = async (initial: {
 const settings = (overrides: Partial<FabricSessionLabelConfig> = {}): FabricSessionLabelConfig => ({
   footer: true,
   herdr: "off",
-  herdrPosition: "prefix",
   ...overrides,
 });
 
@@ -171,30 +170,18 @@ describe.skipIf(process.platform === "win32")("session label in Herdr", () => {
     expect(herdr.tab.label).toBe("fabric-in-pi");
   });
 
-  it("puts the label back as a suffix after another writer renames the pane", async () => {
+  it("puts the label back after another writer renames the pane", async () => {
     const herdr = await startHerdr();
-    const current = settings({ herdr: "pane", herdrPosition: "suffix" });
+    const current = settings({ herdr: "pane" });
     const { presenter } = present({ settings: () => current, environment: herdr.environment });
 
     await presenter.sync();
-    expect(herdr.pane.label).toBe("research FAB-3");
+    expect(herdr.pane.label).toBe("FAB-3 research");
 
     herdr.pane.label = "renamed-by-name-sync";
     await presenter.sync();
-    expect(herdr.pane.label).toBe("renamed-by-name-sync FAB-3");
+    expect(herdr.pane.label).toBe("FAB-3 renamed-by-name-sync");
     expect(herdr.tab.label).toBe("fabric-in-pi");
-  });
-
-  it("moves the label when the position changes", async () => {
-    const herdr = await startHerdr();
-    const current = settings({ herdr: "tab" });
-    const { presenter } = present({ settings: () => current, environment: herdr.environment });
-
-    await presenter.sync();
-    current.herdrPosition = "suffix";
-    await presenter.sync();
-
-    expect(herdr.tab.label).toBe("fabric-in-pi FAB-3");
   });
 
   it("shares one tab between two sessions without renaming back and forth", async () => {

@@ -417,22 +417,15 @@ describe("Fabric configuration", () => {
 
   it("defaults the session label to the footer only and drops invalid label settings", () => {
     const label = (value: unknown) => sessionLabelSettings(normalizeFabricConfig({ ui: { sessionLabel: value } }).ui.sessionLabel);
-    expect(sessionLabelSettings(DEFAULT_FABRIC_CONFIG.ui.sessionLabel)).toEqual({
-      footer: true,
-      herdr: "off",
-      herdrPosition: "prefix",
-    });
-    expect(label({ footer: false, herdr: "both", herdrPosition: "suffix" }))
-      .toEqual({ footer: false, herdr: "both", herdrPosition: "suffix" });
-    expect(label({ footer: true, herdr: "tab", herdrPosition: "prefix" }))
-      .toEqual({ footer: true, herdr: "tab", herdrPosition: "prefix" });
-    expect(label({ herdr: "pane" })).toEqual({ footer: true, herdr: "pane", herdrPosition: "prefix" });
-    expect(label({ footer: "no", herdr: "window", herdrPosition: "middle" }))
-      .toEqual({ footer: true, herdr: "off", herdrPosition: "prefix" });
-    expect(label({ herdr: "toString", herdrPosition: "constructor" }))
-      .toEqual({ footer: true, herdr: "off", herdrPosition: "prefix" });
-    expect(label("tab")).toEqual({ footer: true, herdr: "off", herdrPosition: "prefix" });
-    expect(label(["tab"])).toEqual({ footer: true, herdr: "off", herdrPosition: "prefix" });
+    expect(sessionLabelSettings(DEFAULT_FABRIC_CONFIG.ui.sessionLabel)).toEqual({ footer: true, herdr: "off" });
+    expect(label({ footer: false, herdr: "both" })).toEqual({ footer: false, herdr: "both" });
+    expect(label({ footer: true, herdr: "tab" })).toEqual({ footer: true, herdr: "tab" });
+    expect(label({ herdr: "pane" })).toEqual({ footer: true, herdr: "pane" });
+    expect(label({ footer: "no", herdr: "window" })).toEqual({ footer: true, herdr: "off" });
+    expect(label({ herdr: "toString" })).toEqual({ footer: true, herdr: "off" });
+    expect(label({ herdr: "constructor" })).toEqual({ footer: true, herdr: "off" });
+    expect(label("tab")).toEqual({ footer: true, herdr: "off" });
+    expect(label(["tab"])).toEqual({ footer: true, herdr: "off" });
   });
 
   it("defaults, validates, merges, and persists tool display independently of full code mode", () => {

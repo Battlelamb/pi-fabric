@@ -3,20 +3,16 @@
 // load at first use, so the check stays out of the startup graph.
 
 export const SESSION_LABEL_HERDR_TARGETS = ["off", "tab", "pane", "both"] as const;
-export const SESSION_LABEL_POSITIONS = ["prefix", "suffix"] as const;
 
 /** Which Herdr name, if any, carries this session's Fabric peer label. */
 export type FabricSessionLabelHerdrTarget = (typeof SESSION_LABEL_HERDR_TARGETS)[number];
-export type FabricSessionLabelPosition = (typeof SESSION_LABEL_POSITIONS)[number];
 
 /** Where a root session shows its Fabric peer label, such as `FAB-3`. */
 export interface FabricSessionLabelConfig {
   /** Show the label as a Pi footer status. */
   footer: boolean;
-  /** Add the label to the Herdr tab, the pane, both, or neither. */
+  /** Put the label before the Herdr tab name, the pane name, both, or neither. */
   herdr: FabricSessionLabelHerdrTarget;
-  /** Put the label before or after the existing Herdr name. */
-  herdrPosition: FabricSessionLabelPosition;
 }
 
 const oneOf = <T extends string>(values: readonly T[], value: unknown, fallback: T): T =>
@@ -29,6 +25,5 @@ export const sessionLabelSettings = (value: unknown): FabricSessionLabelConfig =
   return {
     footer: typeof raw.footer === "boolean" ? raw.footer : true,
     herdr: oneOf(SESSION_LABEL_HERDR_TARGETS, raw.herdr, "off"),
-    herdrPosition: oneOf(SESSION_LABEL_POSITIONS, raw.herdrPosition, "prefix"),
   };
 };

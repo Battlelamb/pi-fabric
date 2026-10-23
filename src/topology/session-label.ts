@@ -16,7 +16,6 @@ interface AppliedName {
   kind: HerdrName;
   id: string;
   label: string;
-  position: FabricSessionLabelConfig["herdrPosition"];
 }
 
 export interface SessionLabelPresenterOptions {
@@ -35,14 +34,7 @@ const tokens = (name: string): string[] => name.split(/\s+/).filter(Boolean);
 const stripAffix = (name: string, label: string): string =>
   tokens(name).filter((token) => token !== label).join(" ");
 
-const withAffix = (
-  name: string,
-  label: string,
-  position: FabricSessionLabelConfig["herdrPosition"],
-): string => {
-  if (!name) return label;
-  return position === "prefix" ? `${label} ${name}` : `${name} ${label}`;
-};
+const withAffix = (name: string, label: string): string => (name ? `${label} ${name}` : label);
 
 /**
  * True when the label is already a whole word of the name. Two sessions can
@@ -162,13 +154,13 @@ export class SessionLabelPresenter {
     const wanted = new Set<HerdrName>(label && this.herdrAvailable ? targets(settings.herdr) : []);
     try {
       for (const [key, name] of [...this.#applied]) {
-        if (!wanted.has(name.kind) || name.label !== label || name.position !== settings.herdrPosition) {
+        if (!wanted.has(name.kind) || name.label !== label) {
           await this.#remove(name);
           this.#applied.delete(key);
         }
       }
       if (!label) return;
-      for (const kind of wanted) await this.#apply(kind, label, settings.herdrPosition);
+      for (const kind of wanted) await this.#apply(kind, label);
     } catch {
       // Herdr is unreachable or refused; the next sync reads the live names again.
     }
@@ -180,14 +172,10 @@ export class SessionLabelPresenter {
     if (this.context.hasUI) this.context.ui.setStatus(SESSION_LABEL_STATUS_KEY, text);
   }
 
-  async #apply(
-    kind: HerdrName,
-    label: string,
-    position: FabricSessionLabelConfig["herdrPosition"],
-  ): Promise<void> {
+  async #apply(kind: HerdrName, label: string): Promise<void> {
     const current = await this.#read(kind);
     if (!current) return;
-    const name: AppliedName = { kind, id: current.id, label, position };
+    const name: AppliedName = { kind, id: current.id, label };
     // The pane can move to another tab; forget the label on the old one.
     for (const [key, applied] of [...this.#applied]) {
       if (applied.kind === kind && applied.id !== current.id) {
@@ -198,7 +186,7 @@ export class SessionLabelPresenter {
     this.#applied.set(`${kind}:${current.id}`, name);
     if (hasAffix(current.label, label)) return;
     const base = stripAffix(current.label, label);
-    await this.#rename(kind, current.id, withAffix(base, label, position));
+    await this.#rename(kind, current.id, withAffix(base, label));
   }
 
   async #remove(name: AppliedName): Promise<void> {

@@ -207,8 +207,7 @@ where absent values do not participate, and time spent inside a `humanWaitRefs` 
     "updateDebounceMs": 100,
     "sessionLabel": {
       "footer": true,
-      "herdr": "off",
-      "herdrPosition": "prefix"
+      "herdr": "off"
     }
   },
   "compaction": {
@@ -716,8 +715,7 @@ See the [TypeScript MCP reference](../skillsets/typescript/fabric-exec/reference
 - `ui.updateDebounceMs` defaults to `100`. It applies one execution-wide coalescing interval to every live `fabric_exec` card update: nested calls, progress text, and agent tool previews. Continuous streams emit at most once per interval, so a long call no longer postpones every render until completion. Set it to `0` to emit every update. Accepted values clamp to `0..2000`. The version 3 config migration renamed this key from `ui.nestedToolDebounceMs`.
 - `ui.sessionLabel` controls where a root Pi session shows its Fabric [peer label](agents.md#peer-labels-and-queue-gates), such as `FAB-3`. Child agents and actors never show one.
   - `footer` defaults to `true` and shows `Fabric FAB-3` in the Pi footer.
-  - `herdr` is `"off"` (default), `"tab"`, `"pane"`, or `"both"`. When Pi runs interactively inside Herdr, Fabric adds the label to that tab or pane name. It reads the live name before each change, so a rename by Herdr, by you, or by Pi's own name sync keeps its new text, and Fabric adds its label back within a few seconds. On shutdown, or when you turn the setting off, Fabric removes only its own label word. A pane with no name of its own goes back to having none.
-  - `herdrPosition` is `"prefix"` (default) or `"suffix"`: whether the label goes before or after the existing name.
+  - `herdr` is `"off"` (default), `"tab"`, `"pane"`, or `"both"`. When Pi runs interactively inside Herdr, Fabric puts the label in front of that tab or pane name. It reads the live name before each change, so a rename by Herdr, by you, or by Pi's own name sync keeps its new text, and Fabric adds its label back within a few seconds. On shutdown, or when you turn the setting off, Fabric removes only its own label word. A pane with no name of its own goes back to having none.
   - Labels exist only while `mesh.enabled` is `true`. Change these settings under `/fabric settings` → **UI**; a change applies at once.
 - The widget renders above the chat, like `pi-supervisor`. Set `ui.enabled` to `false` to disable both the widget and the dashboard controller.
 
