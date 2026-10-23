@@ -269,6 +269,12 @@ interface FabricUiConfig {
   showAgentToolPreview: boolean;
   toolDisplay: FabricToolDisplayMode;
   updateDebounceMs: number;
+  /**
+   * Raw `ui.sessionLabel`, passed through unchecked: sessionLabelSettings() in
+   * topology/session-label-settings.ts checks it at first use, which keeps the
+   * check out of the startup graph.
+   */
+  sessionLabel?: unknown;
 }
 
 export interface FabricCompactionPressureBands {
@@ -1322,6 +1328,7 @@ export const normalizeFabricConfig = (input: Record<string, unknown>): FabricCon
         0,
         2_000,
       ),
+      sessionLabel: ui.sessionLabel,
     },
     compaction: {
       engine: compactionEngineValue(compaction.engine, DEFAULT_FABRIC_CONFIG.compaction.engine),
