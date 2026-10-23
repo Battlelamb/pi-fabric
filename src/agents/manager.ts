@@ -242,8 +242,8 @@ interface ManagedAgent extends AgentLifecycleState<AgentRunResult> {
   /** Routed child dialogs in flight; aborted at settlement. */
   questions?: AbortController;
   questionDecisionId?: string;
-  /** Title of the routed child question now waiting on the user. */
-  questionTitle?: string;
+  /** Titles of the routed child questions now waiting on the user, oldest first. */
+  questionTitles?: string[];
   latestRecord?: AgentRunRecord;
   latestUiRecord?: AgentRunRecord;
   background: boolean;
@@ -1614,7 +1614,7 @@ export class AgentManager {
       .map((managed) => ({
         id: managed.id,
         name: managed.actorName ?? managed.name,
-        ...(managed.questionTitle !== undefined ? { question: managed.questionTitle } : {}),
+        ...(managed.questionTitles?.length ? { question: managed.questionTitles.at(-1)! } : {}),
       }));
   }
 
@@ -2357,7 +2357,8 @@ export class AgentManager {
     managed.questions ??= new AbortController();
     const title =
       typeof question.title === "string" && question.title.trim() ? question.title.trim() : "question";
-    managed.questionTitle = title;
+    // A run can have several questions open; each answer removes only its own.
+    (managed.questionTitles ??= []).push(title);
     this.#invalidateUiList();
     return this.#onChildQuestion({
       runId: managed.id,
@@ -2371,7 +2372,8 @@ export class AgentManager {
       },
     }).catch((): AgentChildQuestionResponse => ({ cancelled: true })).then((response) => {
       delete managed.questionDecisionId;
-      if (managed.questionTitle === title) delete managed.questionTitle;
+      const waiting = managed.questionTitles?.lastIndexOf(title) ?? -1;
+      if (waiting >= 0) managed.questionTitles!.splice(waiting, 1);
       this.#invalidateUiList();
       return response;
     });
