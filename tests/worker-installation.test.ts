@@ -101,7 +101,7 @@ describe("standalone worker without Pi host peers", () => {
     const { child, record } = await run();
     expect(child.exitCode).toBe(1);
     expect(record, child.stderr).toMatchObject({ status: "failed", turns: 0, toolCalls: 0 });
-    expect(record?.error).toContain(`Fabric build at ${root} cannot start a worker: its dependency "cross-spawn" is not installed (the build has no node_modules)`);
+    expect(record?.error).toContain(`Fabric build at ${fs.realpathSync(root)} cannot start a worker: its dependency "cross-spawn" is not installed (the build has no node_modules)`);
     expect(record?.error).toContain("restart Pi");
     expect(record?.error).toContain("Cannot find package 'cross-spawn'");
   });

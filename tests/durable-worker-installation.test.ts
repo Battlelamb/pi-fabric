@@ -128,7 +128,7 @@ describe("installed durable worker without host peers", () => {
     fs.rmSync(path.join(root, "node_modules/pi-fabric-worker-sdk"));
     const result = await manager.run({ task: "read fixture", tools: ["read"] });
     expect(result.status).toBe("failed");
-    expect(result.error).toContain(`Fabric build at ${root} cannot start a worker: its dependency "pi-fabric-worker-sdk" is not installed`);
+    expect(result.error).toContain(`Fabric build at ${fs.realpathSync(root)} cannot start a worker: its dependency "pi-fabric-worker-sdk" is not installed`);
     expect(result.error).not.toContain("(the build has no node_modules)");
     expect(result.error).toContain("restart Pi");
   }, 30000);
