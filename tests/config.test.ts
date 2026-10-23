@@ -261,7 +261,7 @@ describe("Fabric configuration", () => {
     expect(DEFAULT_FABRIC_CONFIG.agents.childQuestionTools).toBeUndefined();
     expect(normalizeFabricConfig({}).agents.childQuestionTools).toBeUndefined();
     expect(normalizeFabricConfig({
-      agents: { childQuestionTools: [" ask ", "question", "", 7, "ask", "fabric_exec"] },
+      agents: { childQuestionTools: [" ask ", "question", "", 7, "ask", "fabric_exec", "+ask", "-ask", "*", "ask_*"] },
     }).agents.childQuestionTools).toEqual(["ask", "question"]);
     expect(normalizeFabricConfig({ agents: { childQuestionTools: [] } }).agents.childQuestionTools).toEqual([]);
     expect(normalizeFabricConfig({ agents: { childQuestionTools: "ask" } }).agents.childQuestionTools).toBeUndefined();

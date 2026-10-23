@@ -1271,9 +1271,13 @@ export const normalizeFabricConfig = (input: Record<string, unknown>): FabricCon
       ...(agents.childQuestionTimeoutMs === undefined ? {} : {
         childQuestionTimeoutMs: boundedInteger(agents.childQuestionTimeoutMs, 600_000, 1_000, 86_400_000),
       }),
+      // Exact tool names only: a +name/-name modifier would make the child's
+      // Pi tool list invalid, and a * pattern would grant more than one tool.
       ...(Array.isArray(agents.childQuestionTools) ? {
-        childQuestionTools: [...new Set(agents.childQuestionTools.flatMap((tool) =>
-          typeof tool === "string" && tool.trim() && tool.trim() !== "fabric_exec" ? [tool.trim()] : []))],
+        childQuestionTools: [...new Set(agents.childQuestionTools.flatMap((tool) => {
+          const name = typeof tool === "string" ? tool.trim() : "";
+          return name && name !== "fabric_exec" && !/^[+-]/.test(name) && !name.includes("*") ? [name] : [];
+        }))],
       } : {}),
     },
     jev: normalizeJevConfig(input.jev),
