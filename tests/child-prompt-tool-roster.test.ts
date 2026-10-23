@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { CapturedToolCatalog } from "../src/capture/catalog.js";
 
 // A child's system prompt must name only the tools its allowlist lets it
@@ -45,6 +45,10 @@ const systemPrompt = async (): Promise<string> => {
 };
 
 describe("child prompt tool roster", () => {
+  // The first import of the extension compiles its whole graph, which can
+  // outlast the default test timeout on a loaded runner. Pay it once here.
+  beforeAll(() => import("../src/index.js"), 60_000);
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
